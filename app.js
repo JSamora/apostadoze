@@ -20,10 +20,10 @@ function preencherDataAtual() {
     const hoje = new Date().toISOString().split('T')[0];
     const elAposta = document.getElementById('data-aposta');
     const elRaspadinha = document.getElementById('raspadinha-data');
-    const elCaixa = document.getElementById('modal-caixa-data');
+    const elSub = document.getElementById('modal-sub-data');
     if (elAposta && !elAposta.value) elAposta.value = hoje;
     if (elRaspadinha && !elRaspadinha.value) elRaspadinha.value = hoje;
-    if (elCaixa && !elCaixa.value) elCaixa.value = hoje;
+    if (elSub && !elSub.value) elSub.value = hoje;
 }
 
 // Gestão de Abas
@@ -91,28 +91,39 @@ function carregarDadosDoDrive() {
     }, 800);
 }
 
-// Definições / Banca / Saldo Inicial
+// Gestão de Definições / Menu da Engrenagem
 function abrirConfigBanca() {
-    const novoSaldo = prompt('Insira o valor do Saldo Inicial base (€):', dadosApp.saldoInicial);
-    if (novoSaldo !== null) {
-        const val = parseFloat(novoSaldo);
-        if (!isNaN(val) && val >= 0) {
-            dadosApp.saldoInicial = val;
-            guardarDadosLocais();
-            renderizarTudo();
-            alert('Saldo inicial atualizado com sucesso!');
-        } else {
-            alert('Valor inválido.');
-        }
+    const modal = document.getElementById('modal-definicoes');
+    const inputSaldo = document.getElementById('input-saldo-inicial');
+    if (inputSaldo) inputSaldo.value = dadosApp.saldoInicial;
+    if (modal) modal.classList.remove('hidden');
+}
+
+function fecharConfigBanca() {
+    const modal = document.getElementById('modal-definicoes');
+    if (modal) modal.classList.add('hidden');
+}
+
+function atualizarSaldoInicial() {
+    const val = parseFloat(document.getElementById('input-saldo-inicial').value);
+    if (!isNaN(val) && val >= 0) {
+        dadosApp.saldoInicial = val;
+        guardarDadosLocais();
+        renderizarTudo();
+        alert('Saldo inicial atualizado com sucesso!');
+        fecharConfigBanca();
+    } else {
+        alert('Por favor, insira um valor válido.');
     }
 }
 
-// Controlo do Modal de Depósito e Levantamento
-function abrirModalCaixa(tipo) {
-    const modal = document.getElementById('modal-caixa');
-    const titulo = document.getElementById('modal-caixa-titulo');
-    const inputTipo = document.getElementById('modal-caixa-tipo');
-    const inputValor = document.getElementById('modal-caixa-valor');
+// Controlo dos Sub-Modais de Depósito e Levantamento (dentro do menu)
+function abrirModalCaixaSub(tipo) {
+    fecharConfigBanca();
+    const modal = document.getElementById('modal-caixa-sub');
+    const titulo = document.getElementById('modal-sub-titulo');
+    const inputTipo = document.getElementById('modal-sub-tipo');
+    const inputValor = document.getElementById('modal-sub-valor');
     
     inputValor.value = '';
     preencherDataAtual();
@@ -127,15 +138,16 @@ function abrirModalCaixa(tipo) {
     if (modal) modal.classList.remove('hidden');
 }
 
-function fecharModalCaixa() {
-    const modal = document.getElementById('modal-caixa');
-    if (modal) modal.classList.add('hidden');
+function voltarConfigCaixa() {
+    const modalSub = document.getElementById('modal-caixa-sub');
+    if (modalSub) modalSub.classList.add('hidden');
+    abrirConfigBanca();
 }
 
-function confirmarMovimentoCaixa() {
-    const tipo = document.getElementById('modal-caixa-tipo').value;
-    const valor = parseFloat(document.getElementById('modal-caixa-valor').value);
-    const data = document.getElementById('modal-caixa-data').value || new Date().toISOString().split('T')[0];
+function confirmarMovimentoCaixaSub() {
+    const tipo = document.getElementById('modal-sub-tipo').value;
+    const valor = parseFloat(document.getElementById('modal-sub-valor').value);
+    const data = document.getElementById('modal-sub-data').value || new Date().toISOString().split('T')[0];
 
     if (isNaN(valor) || valor <= 0) {
         alert('Por favor, insira um valor válido.');
@@ -150,7 +162,8 @@ function confirmarMovimentoCaixa() {
     });
 
     guardarDadosLocais();
-    fecharModalCaixa();
+    const modalSub = document.getElementById('modal-caixa-sub');
+    if (modalSub) modalSub.classList.add('hidden');
     renderizarTudo();
     alert(`${tipo === 'deposito' ? 'Depósito' : 'Levantamento'} registado com sucesso!`);
 }
@@ -310,16 +323,14 @@ function renderizarTudo() {
 function calcularBancaTotal() {
     let banca = dadosApp.saldoInicial;
 
-    // Processar apostas
     dadosApp.apostas.forEach(a => {
         if (a.estado === 'Venceu') {
-            banca += (a.valor * a.odd) - a.valor; // Lucro líquido
+            banca += (a.valor * a.odd) - a.valor;
         } else if (a.estado === 'Perdeu') {
             banca -= a.valor;
         }
     });
 
-    // Processar raspadinhas
     dadosApp.raspadinhas.forEach(r => {
         banca -= r.custo;
         if (r.estado === 'Premiado') {
@@ -327,7 +338,6 @@ function calcularBancaTotal() {
         }
     });
 
-    // Processar movimentos de caixa
     dadosApp.movimentosCaixa.forEach(m => {
         if (m.subtipo === 'deposito') banca += m.valor;
         if (m.subtipo === 'levantamento') banca -= m.valor;
@@ -437,7 +447,6 @@ function renderizarHistoricoCompleto() {
 
     container.innerHTML = '';
     
-    // Unificar apostas, raspadinhas e movimentos de caixa para o histórico
     let todos = [
         ...dadosApp.apostas.map((a, i) => ({ ...a, originType: 'aposta', originIndex: i })),
         ...dadosApp.raspadinhas.map((r, i) => ({ ...r, originType: 'raspadinha', originIndex: i })),
