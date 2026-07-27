@@ -20,8 +20,10 @@ function preencherDataAtual() {
     const hoje = new Date().toISOString().split('T')[0];
     const elAposta = document.getElementById('data-aposta');
     const elRaspadinha = document.getElementById('raspadinha-data');
+    const elCaixa = document.getElementById('modal-caixa-data');
     if (elAposta && !elAposta.value) elAposta.value = hoje;
     if (elRaspadinha && !elRaspadinha.value) elRaspadinha.value = hoje;
+    if (elCaixa && !elCaixa.value) elCaixa.value = hoje;
 }
 
 // Gestão de Abas
@@ -89,7 +91,7 @@ function carregarDadosDoDrive() {
     }, 800);
 }
 
-// Definições / Banca / Depósitos / Levantamentos
+// Definições / Banca / Saldo Inicial
 function abrirConfigBanca() {
     const novoSaldo = prompt('Insira o valor do Saldo Inicial base (€):', dadosApp.saldoInicial);
     if (novoSaldo !== null) {
@@ -99,28 +101,65 @@ function abrirConfigBanca() {
             guardarDadosLocais();
             renderizarTudo();
             alert('Saldo inicial atualizado com sucesso!');
-            return;
         } else {
             alert('Valor inválido.');
         }
     }
+}
 
-    // Opcional: Registar depósito ou levantamento rápido
-    const tipoMov = prompt('Deseja registar um Depósito ou Levantamento? Insira "deposito" ou "levantamento" (ou deixe vazio para cancelar):');
-    if (tipoMov && (tipoMov.toLowerCase() === 'deposito' || tipoMov.toLowerCase() === 'levantamento')) {
-        const valMov = prompt(`Insira o valor do ${tipoMov.toLowerCase() === 'deposito' ? 'Depósito' : 'Levantamento'} (€):`);
-        const valorNum = parseFloat(valMov);
-        if (!isNaN(valorNum) && valorNum > 0) {
-            dadosApp.movimentosCaixa.push({
-                tipo: 'caixa',
-                subtipo: tipoMov.toLowerCase(),
-                valor: valorNum,
-                data: new Date().toISOString().split('T')[0]
-            });
-            guardarDadosLocais();
-            renderizarTudo();
-            alert('Movimento de caixa registado com sucesso!');
-        }
+// Controlo do Modal de Depósito e Levantamento
+function abrirModalCaixa(tipo) {
+    const modal = document.getElementById('modal-caixa');
+    const titulo = document.getElementById('modal-caixa-titulo');
+    const inputTipo = document.getElementById('modal-caixa-tipo');
+    const inputValor = document.getElementById('modal-caixa-valor');
+    
+    inputValor.value = '';
+    preencherDataAtual();
+    inputTipo.value = tipo;
+
+    if (tipo === 'deposito') {
+        titulo.innerHTML = '<i class="fa-solid fa-arrow-down text-emerald-400"></i> Registar Depósito';
+    } else {
+        titulo.innerHTML = '<i class="fa-solid fa-arrow-up text-rose-400"></i> Registar Levantamento';
+    }
+
+    if (modal) modal.classList.remove('hidden');
+}
+
+function fecharModalCaixa() {
+    const modal = document.getElementById('modal-caixa');
+    if (modal) modal.classList.add('hidden');
+}
+
+function confirmarMovimentoCaixa() {
+    const tipo = document.getElementById('modal-caixa-tipo').value;
+    const valor = parseFloat(document.getElementById('modal-caixa-valor').value);
+    const data = document.getElementById('modal-caixa-data').value || new Date().toISOString().split('T')[0];
+
+    if (isNaN(valor) || valor <= 0) {
+        alert('Por favor, insira um valor válido.');
+        return;
+    }
+
+    dadosApp.movimentosCaixa.push({
+        tipo: 'caixa',
+        subtipo: tipo,
+        valor: valor,
+        data: data
+    });
+
+    guardarDadosLocais();
+    fecharModalCaixa();
+    renderizarTudo();
+    alert(`${tipo === 'deposito' ? 'Depósito' : 'Levantamento'} registado com sucesso!`);
+}
+
+function apagarMovimentoCaixa(index) {
+    if (confirm('Tem a certeza que pretende apagar este movimento de caixa?')) {
+        dadosApp.movimentosCaixa.splice(index, 1);
+        guardarDadosLocais();
+        renderizarTudo();
     }
 }
 
@@ -398,10 +437,11 @@ function renderizarHistoricoCompleto() {
 
     container.innerHTML = '';
     
-    // Unificar apostas e raspadinhas para o histórico
+    // Unificar apostas, raspadinhas e movimentos de caixa para o histórico
     let todos = [
         ...dadosApp.apostas.map((a, i) => ({ ...a, originType: 'aposta', originIndex: i })),
-        ...dadosApp.raspadinhas.map((r, i) => ({ ...r, originType: 'raspadinha', originIndex: i }))
+        ...dadosApp.raspadinhas.map((r, i) => ({ ...r, originType: 'raspadinha', originIndex: i })),
+        ...dadosApp.movimentosCaixa.map((m, i) => ({ ...m, originType: 'caixa', originIndex: i }))
     ].sort((a, b) => new Date(b.data) - new Date(a.data));
 
     if (contador) contador.innerText = `${todos.length} registos`;
@@ -426,7 +466,7 @@ function renderizarHistoricoCompleto() {
                 </div>
                 <button onclick="apagarAposta(${item.originIndex})" class="text-slate-400 hover:text-rose-400 p-1"><i class="fa-solid fa-trash"></i></button>
             `;
-        } else {
+        } else if (item.originType === 'raspadinha') {
             card.innerHTML = `
                 <div>
                     <div class="flex items-center gap-1.5 mb-0.5">
@@ -436,6 +476,18 @@ function renderizarHistoricoCompleto() {
                     <p class="text-[10px] text-slate-400">${item.data} | Custo: ${item.custo.toFixed(2)} € | Estado: <span class="text-slate-200">${item.estado}</span> ${item.estado === 'Premiado' ? `(Prémio: ${item.premio.toFixed(2)}€)` : ''}</p>
                 </div>
                 <button onclick="apagarRaspadinha(${item.originIndex})" class="text-slate-400 hover:text-rose-400 p-1"><i class="fa-solid fa-trash"></i></button>
+            `;
+        } else {
+            const isDep = item.subtipo === 'deposito';
+            card.innerHTML = `
+                <div>
+                    <div class="flex items-center gap-1.5 mb-0.5">
+                        <span class="text-[9px] ${isDep ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'} px-1.5 py-0.5 rounded uppercase">${item.subtipo}</span>
+                        <span class="font-semibold text-white">Movimento de Caixa</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400">${item.data} | Valor: <span class="${isDep ? 'text-emerald-400' : 'text-rose-400'} font-bold">${isDep ? '+' : '-'}${item.valor.toFixed(2)} €</span></p>
+                </div>
+                <button onclick="apagarMovimentoCaixa(${item.originIndex})" class="text-slate-400 hover:text-rose-400 p-1"><i class="fa-solid fa-trash"></i></button>
             `;
         }
         container.appendChild(card);
@@ -477,7 +529,6 @@ function atualizarExtrato() {
     const filtroMes = document.getElementById('filtro-mes').value;
     const filtroSemana = document.getElementById('filtro-semana').value;
 
-    // Compilar todas as transações cronologicamente
     let transacoes = [];
 
     dadosApp.apostas.forEach(a => {
@@ -505,7 +556,6 @@ function atualizarExtrato() {
 
     transacoes.sort((a, b) => new Date(a.data) - new Date(b.data));
 
-    // Filtrar por ano, mês e semana
     let filtradas = transacoes.filter(t => {
         if (!t.data) return false;
         const [ano, mes, dia] = t.data.split('-');
@@ -521,9 +571,8 @@ function atualizarExtrato() {
 
     tbody.innerHTML = '';
     let acumulado = dadosApp.saldoInicial;
-    
-    // Calcular saldo inicial acumulado até ao filtro, se necessário, ou correr sequencialmente
     let movimentosTotais = 0;
+
     filtradas.forEach(t => {
         movimentosTotais++;
         acumulado += (t.credito - t.debito);
@@ -544,7 +593,6 @@ function atualizarExtrato() {
 
     if (contadorExtrato) contadorExtrato.innerText = `${movimentosTotais} movimentos`;
 
-    // Atualizar caixas de saldos resumidos (anual, mensal, semanal)
     atualizarSaldosTemporais(transacoes);
 }
 
@@ -617,6 +665,11 @@ function gerarPdfExtrato() {
         transacoes.push({ data: r.data, desc: `Raspadinha: ${r.nome}`, debito: r.custo, credito: 0 });
         if (r.estado === 'Premiado') transacoes.push({ data: r.data, desc: `Prémio Raspadinha: ${r.nome}`, debito: 0, credito: r.premio });
     });
+    dadosApp.movimentosCaixa.forEach(m => {
+        if (m.subtipo === 'deposito') transacoes.push({ data: m.data, desc: `Depósito de Capital`, debito: 0, credito: m.valor });
+        if (m.subtipo === 'levantamento') transacoes.push({ data: m.data, desc: `Levantamento de Capital`, debito: m.valor, credito: 0 });
+    });
+    
     transacoes.sort((a, b) => new Date(a.data) - new Date(b.data));
 
     transacoes.forEach(t => {
@@ -640,7 +693,6 @@ function atualizarGraficoLinhas() {
     container.innerHTML = '';
     eixoX.innerHTML = '';
 
-    // Agrupar transações por dia e calcular saldo acumulado temporal
     let transacoes = [];
     dadosApp.apostas.forEach(a => {
         if (a.estado === 'Perdido') transacoes.push({ data: a.data, val: -a.valor });
@@ -659,7 +711,6 @@ function atualizarGraficoLinhas() {
     let pontosPorDia = {};
     let runningBanca = dadosApp.saldoInicial;
     
-    // Adicionar ponto inicial base se necessário
     pontosPorDia[transacoes.length > 0 ? transacoes[0].data : new Date().toISOString().split('T')[0]] = runningBanca;
 
     transacoes.forEach(t => {
@@ -678,10 +729,8 @@ function atualizarGraficoLinhas() {
     const maxVal = Math.max(...valores, dadosApp.saldoInicial) * 1.05;
     const amplitude = maxVal - minVal || 1;
 
-    // Criar elementos SVG dinâmicos
     let svgHTML = `<svg class="w-full h-full overflow-visible" viewBox="0 0 300 120" preserveAspectRatio="none">`;
     
-    // Linha de referência do Saldo Inicial
     const ySaldoInicial = 120 - ((dadosApp.saldoInicial - minVal) / amplitude) * 110;
     svgHTML += `<line x1="0" y1="${ySaldoInicial}" x2="300" y2="${ySaldoInicial}" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.8"/>`;
 
@@ -708,7 +757,6 @@ function atualizarGraficoLinhas() {
     svgHTML += `</svg>`;
     container.innerHTML = svgHTML;
 
-    // Rótulos do eixo X
     if (datas.length > 0) {
         eixoX.innerHTML = `<span>${datas[0]}</span><span>${datas[datas.length - 1]}</span>`;
     }
