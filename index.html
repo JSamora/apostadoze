@@ -40,21 +40,22 @@
         <div class="bg-slate-800 px-4 py-3 border-b border-slate-700 flex justify-between items-center shrink-0">
             <div>
                 <h1 class="text-base font-bold text-emerald-400">Apostas do Zé</h1>
-                <p class="text-[10px] text-slate-400">Gestão de Apostas & Saldos (Drive)</p>
+                <p class="text-[10px] text-slate-400">Gestão de Apostas, Raspadinhas & Saldos</p>
             </div>
             <div class="flex items-center gap-2">
                 <button onclick="carregarDadosDoDrive()" class="bg-slate-700 hover:bg-slate-600 p-2.5 rounded-full text-xs text-emerald-400 transition" title="Sincronizar com o Drive">
                     <i class="fa-solid fa-rotate" id="icon-sync"></i>
                 </button>
-                <button onclick="abrirConfigBanca()" class="bg-slate-700 hover:bg-slate-600 p-2.5 rounded-full text-xs text-slate-200 transition" title="Definições / Alterar Banca Inicial">
+                <button onclick="abrirConfigBanca()" class="bg-slate-700 hover:bg-slate-600 p-2.5 rounded-full text-xs text-slate-200 transition" title="Definições / Caixa">
                     <i class="fa-solid fa-gear"></i>
                 </button>
             </div>
         </div>
 
-        <!-- Abas de Navegação Interna -->
-        <div class="bg-slate-900 px-2 py-1.5 grid grid-cols-4 gap-1 border-b border-slate-800 text-[11px] text-center shrink-0">
-            <button onclick="mudarAba('registo')" id="tab-registo" class="px-1 py-1.5 font-semibold text-emerald-400 border-b-2 border-emerald-400 transition truncate">Registar</button>
+        <!-- Abas de Navegação Interna (5 Abas) -->
+        <div class="bg-slate-900 px-1 py-1.5 grid grid-cols-5 gap-1 border-b border-slate-800 text-[10px] text-center shrink-0">
+            <button onclick="mudarAba('registo')" id="tab-registo" class="px-1 py-1.5 font-semibold text-emerald-400 border-b-2 border-emerald-400 transition truncate">Apostas</button>
+            <button onclick="mudarAba('raspadinhas')" id="tab-raspadinhas" class="px-1 py-1.5 font-semibold text-slate-400 hover:text-slate-200 transition truncate">Raspadinhas</button>
             <button onclick="mudarAba('historico')" id="tab-historico" class="px-1 py-1.5 font-semibold text-slate-400 hover:text-slate-200 transition truncate">Histórico</button>
             <button onclick="mudarAba('extrato')" id="tab-extrato" class="px-1 py-1.5 font-semibold text-slate-400 hover:text-slate-200 transition truncate">Extrato</button>
             <button onclick="mudarAba('graficos')" id="tab-graficos" class="px-1 py-1.5 font-semibold text-slate-400 hover:text-slate-200 transition truncate">Gráficos</button>
@@ -76,7 +77,7 @@
                 </div>
             </div>
 
-            <!-- SECÇÃO 1: REGISTO E RESUMO RECENTE -->
+            <!-- SECÇÃO 1: REGISTO DE APOSTAS -->
             <div id="secao-registo" class="flex-1 flex flex-col space-y-2.5 overflow-hidden">
                 <div class="bg-slate-800 p-3 rounded-2xl border border-slate-700 shrink-0">
                     <h3 id="form-title" class="text-xs font-semibold text-emerald-400 mb-2 flex items-center gap-2">
@@ -138,24 +139,78 @@
                     </div>
                 </div>
 
-                <!-- Lista Reduzida com Scroll Exclusivo: Últimos 7 Dias -->
+                <!-- Lista Recentes -->
                 <div class="flex-1 flex flex-col overflow-hidden">
                     <h3 class="text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between shrink-0">
                         <span>Apostas Recentes (Últimos 7 Dias)</span>
                         <span id="contador-recentes" class="text-[10px] bg-slate-700 px-2 py-0.5 rounded-full text-slate-400">0 registos</span>
                     </h3>
                     <div id="lista-recentes" class="space-y-2 overflow-y-auto flex-1 pr-1">
-                        <div class="text-center py-4 text-slate-500 text-xs italic">A carregar dados do Drive...</div>
+                        <div class="text-center py-4 text-slate-500 text-xs italic">A carregar dados...</div>
                     </div>
                 </div>
             </div>
 
-            <!-- SECÇÃO 2: HISTÓRICO COMPLETO DE APOSTAS -->
+            <!-- SECÇÃO 2: RASPADINHAS -->
+            <div id="secao-raspadinhas" class="hidden flex-1 flex flex-col space-y-2.5 overflow-hidden">
+                <div class="bg-slate-800 p-3 rounded-2xl border border-slate-700 shrink-0">
+                    <h3 class="text-xs font-semibold text-emerald-400 mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-ticket"></i> Registar Raspadinha
+                    </h3>
+                    <div class="space-y-2">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[10px] text-slate-400">Nome / Tipo</label>
+                                <input type="text" id="raspadinha-nome" placeholder="Ex: Mega Sorte" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400">Custo (€)</label>
+                                <input type="number" step="0.01" id="raspadinha-custo" placeholder="2.00" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[10px] text-slate-400">Estado / Resultado</label>
+                                <select id="raspadinha-estado" onchange="toggleValorPremio()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+                                    <option value="Perdido">Perdido (Sem Prémio)</option>
+                                    <option value="Premiado">Premiado (Ganhou Prémio)</option>
+                                </select>
+                            </div>
+                            <div id="container-premio" class="hidden">
+                                <label class="text-[10px] text-slate-400">Valor do Prémio (€)</label>
+                                <input type="number" step="0.01" id="raspadinha-premio" placeholder="10.00" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="text-[10px] text-slate-400">Data</label>
+                            <input type="date" id="raspadinha-data" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-[11px] text-white focus:outline-none focus:border-emerald-500">
+                        </div>
+
+                        <button onclick="guardarRaspadinha()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-2 rounded-lg text-xs transition shadow-md mt-0.5">
+                            Registar Raspadinha
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex-1 flex flex-col overflow-hidden">
+                    <h3 class="text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between shrink-0">
+                        <span>Raspadinhas Recentes</span>
+                        <span id="contador-raspadinhas" class="text-[10px] bg-slate-700 px-2 py-0.5 rounded-full text-slate-400">0 registos</span>
+                    </h3>
+                    <div id="lista-raspadinhas" class="space-y-2 overflow-y-auto flex-1 pr-1">
+                        <div class="text-center py-4 text-slate-500 text-xs italic">Sem registos de raspadinhas.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECÇÃO 3: HISTÓRICO COMPLETO -->
             <div id="secao-historico" class="hidden flex-1 flex flex-col space-y-2.5 overflow-hidden">
                 <div class="bg-slate-800 p-3 rounded-2xl border border-slate-700 flex justify-between items-center shrink-0">
                     <div>
                         <h3 class="text-xs font-semibold text-emerald-400">Histórico Completo</h3>
-                        <p class="text-[10px] text-slate-400">Todos os registos por ordem cronológica.</p>
+                        <p class="text-[10px] text-slate-400">Apostas e Raspadinhas por ordem cronológica.</p>
                     </div>
                     <span id="contador-historico" class="text-[10px] bg-slate-700 px-2 py-0.5 rounded-full text-slate-300">0 registos</span>
                 </div>
@@ -164,7 +219,7 @@
                 </div>
             </div>
 
-            <!-- SECÇÃO 3: EXTRATO E SALDOS TEMPORAIS -->
+            <!-- SECÇÃO 4: EXTRATO -->
             <div id="secao-extrato" class="hidden flex-1 flex flex-col space-y-2.5 overflow-hidden">
                 <div class="bg-slate-800 p-3 rounded-2xl border border-slate-700 space-y-2 shrink-0">
                     <div class="flex justify-between items-center">
@@ -242,7 +297,7 @@
                 </div>
             </div>
 
-            <!-- SECÇÃO 4: GRÁFICO DE LINHAS DA BANCA -->
+            <!-- SECÇÃO 5: GRÁFICOS -->
             <div id="secao-graficos" class="hidden flex-1 flex flex-col space-y-2.5 overflow-hidden">
                 <div class="bg-slate-800 p-3.5 rounded-2xl border border-slate-700 space-y-2.5 flex-1 flex flex-col overflow-hidden">
                     <div class="flex justify-between items-center shrink-0">
@@ -251,7 +306,7 @@
                         </h3>
                         <span class="text-[9px] text-rose-400 flex items-center gap-1 font-semibold"><span class="w-2 h-0.5 bg-rose-500 inline-block"></span> Linha de Saldo Inicial</span>
                     </div>
-                    <p class="text-[10px] text-slate-400 shrink-0">Evolução por dias com apostas registadas (linha vermelha tracejada = saldo inicial).</p>
+                    <p class="text-[10px] text-slate-400 shrink-0">Evolução por dias com movimentos registados.</p>
 
                     <div class="grid grid-cols-2 gap-2 bg-slate-900 p-2.5 rounded-xl border border-slate-700 shrink-0">
                         <div>
@@ -275,25 +330,15 @@
 
         </div>
 
-        <!-- Barra de Navegação Inferior -->
-        <div class="bg-slate-900 py-2.5 px-4 border-t border-slate-800 flex justify-around text-slate-400 text-[10px] shrink-0">
-            <button onclick="mudarAba('registo')" id="nav-btn-registo" class="text-emerald-400 flex flex-col items-center"><i class="fa-solid fa-house text-sm"></i><span>Registar</span></button>
+        <!-- Barra de Navegação Inferior (5 Botões) -->
+        <div class="bg-slate-900 py-2 px-2 border-t border-slate-800 flex justify-around text-slate-400 text-[9px] shrink-0">
+            <button onclick="mudarAba('registo')" id="nav-btn-registo" class="text-emerald-400 flex flex-col items-center"><i class="fa-solid fa-house text-sm"></i><span>Apostas</span></button>
+            <button onclick="mudarAba('raspadinhas')" id="nav-btn-raspadinhas" class="flex flex-col items-center hover:text-slate-200 text-slate-400"><i class="fa-solid fa-ticket text-sm"></i><span>Raspadinhas</span></button>
             <button onclick="mudarAba('historico')" id="nav-btn-historico" class="flex flex-col items-center hover:text-slate-200 text-slate-400"><i class="fa-solid fa-list-check text-sm"></i><span>Histórico</span></button>
             <button onclick="mudarAba('extrato')" id="nav-btn-extrato" class="flex flex-col items-center hover:text-slate-200 text-slate-400"><i class="fa-solid fa-receipt text-sm"></i><span>Extrato</span></button>
             <button onclick="mudarAba('graficos')" id="nav-btn-graficos" class="flex flex-col items-center hover:text-slate-200 text-slate-400"><i class="fa-solid fa-chart-line text-sm"></i><span>Gráficos</span></button>
         </div>
     </div>
-
-    <!-- Registo do Service Worker para PWA -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('Service Worker registado com sucesso:', reg.scope))
-                    .catch(err => console.log('Falha ao registar o Service Worker:', err));
-            });
-        }
-    </script>
 
     <!-- Script de Lógica Principal -->
     <script src="app.js"></script>
