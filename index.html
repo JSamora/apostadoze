@@ -1,106 +1,885 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Apostas do Zé</title>
-  
-  <!-- PWA Manifest & Theme -->
-  <link rel="manifest" href="./manifest.json">
-  <meta name="theme-color" content="#10b981">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
-  <!-- Tailwind CSS para um design moderno e responsivo -->
-  <script src="https://cdn.tailwindcss.com"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apostas do Zé</title>
+    <!-- Linha do Manifesto PWA adicionada -->
+    <link rel="manifest" href="manifest.json">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Importação da biblioteca jsPDF para geração de PDF no browser -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        body {
+            background-color: #0f172a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .mobile-frame {
+            width: 100%;
+            max-width: 410px;
+            height: 88vh;
+            max-height: 880px;
+            min-height: 700px;
+            margin: auto;
+            background-color: #1e293b;
+            border-radius: 36px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            border: 8px solid #334155;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+    </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col items-center justify-between p-4">
+<body class="flex items-center justify-center h-screen overflow-hidden p-2">
 
-  <!-- Cabeçalho -->
-  <header class="w-full max-w-md bg-slate-800 p-4 rounded-2xl shadow-lg flex justify-between items-center mb-4">
-    <div>
-      <h1 class="text-xl font-bold text-emerald-400">Apostas do Zé</h1>
-      <p class="text-xs text-slate-400">Gestão de Apostas & Saldos</p>
+    <div class="mobile-frame text-slate-100">
+        <!-- Barra de Estado do Telemóvel -->
+        <div class="bg-slate-900 px-6 py-1.5 flex justify-between items-center text-xs text-slate-400 select-none shrink-0">
+            <span>15:45</span>
+            <div class="flex space-x-2">
+                <i class="fa-solid fa-signal"></i>
+                <i class="fa-solid fa-wifi"></i>
+                <i class="fa-solid fa-battery-full text-emerald-400"></i>
+            </div>
+        </div>
+
+        <!-- Cabeçalho da Aplicação -->
+        <div class="bg-slate-800 px-5 py-2.5 border-b border-slate-700 flex justify-between items-center shrink-0">
+            <div>
+                <h1 class="text-base font-bold text-emerald-400">Apostas do Zé</h1>
+                <p class="text-[10px] text-slate-400">Gestão de Apostas & Saldos (Drive)</p>
+            </div>
+            <div class="flex items-center gap-1.5">
+                <button onclick="carregarDadosDoDrive()" class="bg-slate-700 hover:bg-slate-600 p-2 rounded-full text-xs text-emerald-400 transition" title="Sincronizar com o Drive">
+                    <i class="fa-solid fa-rotate" id="icon-sync"></i>
+                </button>
+                <button onclick="abrirConfigBanca()" class="bg-slate-700 hover:bg-slate-600 p-2 rounded-full text-xs text-slate-200 transition" title="Definições / Alterar Banca Inicial">
+                    <i class="fa-solid fa-gear"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Abas de Navegação Interna -->
+        <div class="bg-slate-900 px-2 py-1.5 grid grid-cols-4 gap-1 border-b border-slate-800 text-[11px] text-center shrink-0">
+            <button onclick="mudarAba('registo')" id="tab-registo" class="px-1 py-1 font-semibold text-emerald-400 border-b-2 border-emerald-400 transition truncate">Registar</button>
+            <button onclick="mudarAba('historico')" id="tab-historico" class="px-1 py-1 font-semibold text-slate-400 hover:text-slate-200 transition truncate">Histórico</button>
+            <button onclick="mudarAba('extrato')" id="tab-extrato" class="px-1 py-1 font-semibold text-slate-400 hover:text-slate-200 transition truncate">Extrato</button>
+            <button onclick="mudarAba('graficos')" id="tab-graficos" class="px-1 py-1 font-semibold text-slate-400 hover:text-slate-200 transition truncate">Gráficos</button>
+        </div>
+
+        <!-- Conteúdo Global da App -->
+        <div class="flex-1 overflow-hidden p-3.5 flex flex-col">
+            
+            <!-- Painel de Banca Global -->
+            <div class="bg-gradient-to-r from-emerald-600 to-teal-700 p-3 rounded-2xl shadow-lg text-white mb-2.5 shrink-0">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-[10px] uppercase tracking-wider opacity-80">Banca Atual / Saldo Total</p>
+                        <h2 id="banca-atual" class="text-2xl font-extrabold mt-0.5">100.00 €</h2>
+                    </div>
+                    <div class="bg-emerald-800/40 px-2.5 py-1 rounded-xl text-[10px] text-emerald-100 flex items-center gap-1">
+                        <i class="fa-solid fa-cloud"><span>Drive</span></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECÇÃO 1: REGISTO E RESUMO RECENTE -->
+            <div id="secao-registo" class="flex-1 flex flex-col space-y-2.5 overflow-hidden">
+                <div class="bg-slate-800 p-3 rounded-2xl border border-slate-700 shrink-0">
+                    <h3 id="form-title" class="text-xs font-semibold text-emerald-400 mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-plus-circle"></i> Registar Nova Aposta
+                    </h3>
+                    <input type="hidden" id="edit-index" value="-1">
+                    
+                    <div class="space-y-2">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[10px] text-slate-400">Modalidade</label>
+                                <select id="modalidade-aposta" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                                    <option value="Futebol">Futebol</option>
+                                    <option value="Basquetebol">Basquetebol</option>
+                                    <option value="Ténis">Ténis</option>
+                                    <option value="Hóquei">Hóquei</option>
+                                    <option value="Outros">Outros</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400">Estado</label>
+                                <select id="estado-aposta" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                                    <option value="Pendente">Pendente</option>
+                                    <option value="Venceu">Venceu</option>
+                                    <option value="Perdeu">Perdeu</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[10px] text-slate-400">Equipa A (Casa)</label>
+                                <input type="text" id="equipa-a" placeholder="Ex: FC Porto" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400">Equipa B (Fora)</label>
+                                <input type="text" id="equipa-b" placeholder="Ex: Benfica" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <label class="text-[10px] text-slate-400">Valor (€)</label>
+                                <input type="number" step="0.01" id="valor-aposta" placeholder="10.00" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400">ODD</label>
+                                <input type="number" step="0.01" id="odd-aposta" placeholder="1.85" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400">Data</label>
+                                <input type="date" id="data-aposta" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-[11px] text-white focus:outline-none focus:border-emerald-500">
+                            </div>
+                        </div>
+
+                        <button onclick="guardarAposta()" id="btn-salvar" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-1.5 rounded-lg text-xs transition shadow-md mt-0.5">
+                            Concluir e Registar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Lista Reduzida com Scroll Exclusivo: Últimos 7 Dias -->
+                <div class="flex-1 flex flex-col overflow-hidden">
+                    <h3 class="text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between shrink-0">
+                        <span>Apostas Recentes (Últimos 7 Dias)</span>
+                        <span id="contador-recentes" class="text-[10px] bg-slate-700 px-2 py-0.5 rounded-full text-slate-400">0 registos</span>
+                    </h3>
+                    <div id="lista-recentes" class="space-y-2 overflow-y-auto flex-1 pr-1">
+                        <div class="text-center py-4 text-slate-500 text-xs italic">A carregar dados do Drive...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECÇÃO 2: HISTÓRICO COMPLETO DE APOSTAS -->
+            <div id="secao-historico" class="hidden flex-1 flex flex-col space-y-2.5 overflow-hidden">
+                <div class="bg-slate-800 p-2.5 rounded-2xl border border-slate-700 flex justify-between items-center shrink-0">
+                    <div>
+                        <h3 class="text-xs font-semibold text-emerald-400">Histórico Completo</h3>
+                        <p class="text-[10px] text-slate-400">Todos os registos por ordem cronológica.</p>
+                    </div>
+                    <span id="contador-historico" class="text-[10px] bg-slate-700 px-2 py-0.5 rounded-full text-slate-300">0 registos</span>
+                </div>
+                <div id="lista-historico-completo" class="space-y-2 overflow-y-auto flex-1 pr-1">
+                    <div class="text-center py-5 text-slate-500 text-xs italic">A carregar...</div>
+                </div>
+            </div>
+
+            <!-- SECÇÃO 3: EXTRATO E SALDOS TEMPORAIS -->
+            <div id="secao-extrato" class="hidden flex-1 flex flex-col space-y-2.5 overflow-hidden">
+                <div class="bg-slate-800 p-2.5 rounded-2xl border border-slate-700 space-y-1.5 shrink-0">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xs font-semibold text-emerald-400 flex items-center gap-2">
+                            <i class="fa-solid fa-filter"></i> Filtros Temporais
+                        </h3>
+                        <button onclick="gerarPdfExtrato()" class="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-2.5 py-1 rounded-lg text-[10px] transition flex items-center gap-1 shadow">
+                            <i class="fa-solid fa-file-pdf"></i> Gerar Extrato
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-3 gap-1.5">
+                        <div>
+                            <label class="text-[9px] text-slate-400">Ano</label>
+                            <select id="filtro-ano" onchange="atualizarExtrato()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-1 text-xs text-white">
+                                <option value="todos">Todos</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[9px] text-slate-400">Mês</label>
+                            <select id="filtro-mes" onchange="atualizarExtrato()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-1 text-xs text-white">
+                                <option value="todos">Todos</option>
+                                <option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option>
+                                <option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option>
+                                <option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option>
+                                <option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[9px] text-slate-400">Semana</label>
+                            <select id="filtro-semana" onchange="atualizarExtrato()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-1 text-xs text-white">
+                                <option value="todas">Todas</option>
+                                <option value="1">Semana 1 (1-7)</option>
+                                <option value="2">Semana 2 (8-14)</option>
+                                <option value="3">Semana 3 (15-21)</option>
+                                <option value="4">Semana 4+ (22-31)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2 shrink-0">
+                    <div class="bg-slate-800 border border-slate-700 p-2 rounded-xl text-center">
+                        <p class="text-[9px] uppercase text-slate-400">Saldo Anual</p>
+                        <p id="saldo-anual" class="text-xs font-bold text-emerald-400 mt-0.5">0.00 €</p>
+                    </div>
+                    <div class="bg-slate-800 border border-slate-700 p-2 rounded-xl text-center">
+                        <p class="text-[9px] uppercase text-slate-400">Saldo Mensal</p>
+                        <p id="saldo-mensal" class="text-xs font-bold text-emerald-400 mt-0.5">0.00 €</p>
+                    </div>
+                    <div class="bg-slate-800 border border-slate-700 p-2 rounded-xl text-center">
+                        <p class="text-[9px] uppercase text-slate-400">Saldo Semanal</p>
+                        <p id="saldo-semanal" class="text-xs font-bold text-emerald-400 mt-0.5">0.00 €</p>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 p-2.5 rounded-2xl border border-slate-700 flex-1 flex flex-col overflow-hidden">
+                    <h3 class="text-xs font-semibold text-emerald-400 mb-1.5 flex items-center justify-between shrink-0">
+                        <span>Extrato Filtrado</span>
+                        <span id="extrato-contador" class="text-[9px] text-slate-400">0 movimentos</span>
+                    </h3>
+                    <div class="overflow-y-auto flex-1 pr-1">
+                        <table class="w-full text-left text-[10px]">
+                            <thead>
+                                <tr class="border-b border-slate-700 text-slate-400 sticky top-0 bg-slate-800">
+                                    <th class="py-1 px-1">Data / Descrição</th>
+                                    <th class="py-1 px-1 text-rose-400">Débito</th>
+                                    <th class="py-1 px-1 text-emerald-400">Crédito</th>
+                                    <th class="py-1 px-1 text-right">Acumulado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-extrato">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECÇÃO 4: GRÁFICO DE LINHAS DA BANCA -->
+            <div id="secao-graficos" class="hidden flex-1 flex flex-col space-y-2.5 overflow-hidden">
+                <div class="bg-slate-800 p-3 rounded-2xl border border-slate-700 space-y-2.5 flex-1 flex flex-col overflow-hidden">
+                    <div class="flex justify-between items-center shrink-0">
+                        <h3 class="text-xs font-semibold text-emerald-400 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line"></i> Evolução da Banca
+                        </h3>
+                        <span class="text-[9px] text-rose-400 flex items-center gap-1 font-semibold"><span class="w-2 h-0.5 bg-rose-500 inline-block"></span> Linha de Saldo Inicial</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400 shrink-0">Evolução por dias com apostas registadas (linha vermelha tracejada = saldo inicial).</p>
+
+                    <div class="grid grid-cols-2 gap-2 bg-slate-900 p-2 rounded-xl border border-slate-700 shrink-0">
+                        <div>
+                            <label class="text-[9px] text-slate-400">Data Início</label>
+                            <input type="date" id="grafico-data-inicio" onchange="atualizarGraficoLinhas()" class="w-full bg-slate-800 border border-slate-700 rounded p-1 text-[10px] text-white focus:outline-none focus:border-emerald-500">
+                        </div>
+                        <div>
+                            <label class="text-[9px] text-slate-400">Data Fim</label>
+                            <input type="date" id="grafico-data-fim" onchange="atualizarGraficoLinhas()" class="w-full bg-slate-800 border border-slate-700 rounded p-1 text-[10px] text-white focus:outline-none focus:border-emerald-500">
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-900 p-2 rounded-xl border border-slate-700/50 relative flex-1 min-h-[120px] flex flex-col justify-end">
+                        <div id="grafico-linhas-svg-container" class="w-full h-full relative flex items-end">
+                        </div>
+                    </div>
+                    <div class="flex justify-between text-[9px] text-slate-400 px-1 shrink-0" id="grafico-eixo-x-labels">
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Barra de Navegação Inferior -->
+        <div class="bg-slate-900 py-2 px-4 border-t border-slate-800 flex justify-around text-slate-400 text-[10px] shrink-0">
+            <button onclick="mudarAba('registo')" id="nav-btn-registo" class="text-emerald-400 flex flex-col items-center"><i class="fa-solid fa-house text-sm"></i><span>Registar</span></button>
+            <button onclick="mudarAba('historico')" id="nav-btn-historico" class="flex flex-col items-center hover:text-slate-200 text-slate-400"><i class="fa-solid fa-list-check text-sm"></i><span>Histórico</span></button>
+            <button onclick="mudarAba('extrato')" id="nav-btn-extrato" class="flex flex-col items-center hover:text-slate-200 text-slate-400"><i class="fa-solid fa-receipt text-sm"></i><span>Extrato</span></button>
+            <button onclick="mudarAba('graficos')" id="nav-btn-graficos" class="flex flex-col items-center hover:text-slate-200 text-slate-400"><i class="fa-solid fa-chart-line text-sm"></i><span>Gráficos</span></button>
+        </div>
     </div>
-    <div id="saldo-atual" class="text-right">
-      <span class="block text-xs text-slate-400">Saldo Atual</span>
-      <span class="text-lg font-semibold text-emerald-400">0.00 €</span>
-    </div>
-  </header>
 
-  <!-- Conteúdo Principal -->
-  <main class="w-full max-w-md bg-slate-800 p-5 rounded-2xl shadow-lg flex-grow flex flex-col gap-4">
-    <section id="nova" class="flex flex-col gap-3">
-      <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Registar Aposta</h2>
-      <input type="text" id="descricao" placeholder="Descrição (ex: Jogo Benfica)" class="bg-slate-900 border border-slate-700 p-3 rounded-xl text-sm focus:outline-none focus:border-emerald-500">
-      <input type="number" step="0.01" id="valor" placeholder="Valor (€)" class="bg-slate-900 border border-slate-700 p-3 rounded-xl text-sm focus:outline-none focus:border-emerald-500">
-      <button onclick="registarAposta()" class="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold p-3 rounded-xl transition">Adicionar Aposta</button>
-    </section>
+    <!-- Script Lógica com Sincronização Google Apps Script -->
+    <script>
+        const DRIVE_API_URL = "https://script.google.com/macros/s/AKfycbxxjoFddFM8AcaCS42YHie1wwNMTmw8YqNobmsUrQZWWgr1FqUKMdKuCV8YQl0fhm9K-A/exec";
+        
+        let bancaInicial = 100.00;
+        let apostas = [];
 
-    <hr class="border-slate-700">
+        document.getElementById('data-aposta').valueAsDate = new Date();
 
-    <section id="saldo" class="flex flex-col gap-2 flex-grow">
-      <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Histórico</h2>
-      <div id="historico" class="flex flex-col gap-2 overflow-y-auto max-h-48 pr-1 text-sm">
-        <p class="text-slate-500 text-center italic py-4">Sem apostas registadas.</p>
-      </div>
-    </section>
-  </main>
+        function inicializarDatasMesAtual() {
+            let hoje = new Date();
+            let ano = hoje.getFullYear();
+            let mes = String(hoje.getMonth() + 1).padStart(2, '0');
+            let primeiroDia = `${ano}-${mes}-01`;
+            let ultimoDiaObj = new Date(ano, hoje.getMonth() + 1, 0);
+            let ultimoDia = `${ano}-${mes}-${String(ultimoDiaObj.getDate()).padStart(2, '0')}`;
 
-  <!-- Rodapé -->
-  <footer class="w-full max-w-md text-center py-3 text-xs text-slate-500">
-    Apostas do Zé &copy; 2026 — Sincronização Ativa
-  </footer>
+            document.getElementById('grafico-data-inicio').value = primeiroDia;
+            document.getElementById('grafico-data-fim').value = ultimoDia;
+        }
+        inicializarDatasMesAtual();
 
-  <!-- Lógica da Aplicação & Registo do Service Worker -->
-  <script>
-    // Registo automático do Service Worker para suporte PWA/Offline
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then((reg) => console.log('ServiceWorker registado com sucesso:', reg.scope))
-          .catch((err) => console.log('Erro ao registar ServiceWorker:', err));
-      });
-    }
+        async function carregarDadosDoDrive() {
+            let icon = document.getElementById('icon-sync');
+            if (icon) icon.classList.add('fa-spin');
+            
+            try {
+                let resposta = await fetch(DRIVE_API_URL);
+                let dados = await resposta.json();
+                if (Array.isArray(dados)) {
+                    apostas = dados;
+                }
+            } catch (erro) {
+                console.error("Erro ao carregar dados do Drive:", erro);
+            } finally {
+                if (icon) icon.classList.remove('fa-spin');
+                atualizarInterface();
+            }
+        }
 
-    // Lógica simples de exemplo para a interface
-    let saldoTotal = 0.0;
-    let apostas = [];
+        async function guardarDadosNoDrive() {
+            try {
+                await fetch(DRIVE_API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(apostas)
+                });
+            } catch (erro) {
+                console.error("Erro ao guardar dados no Drive:", erro);
+            }
+        }
 
-    function registarAposta() {
-      const descInput = document.getElementById('descricao');
-      const valorInput = document.getElementById('valor');
-      const historicoDiv = document.getElementById('historico');
-      const saldoDisplay = document.querySelector('#saldo-atual span:last-child');
+        function mudarAba(aba) {
+            document.getElementById('secao-registo').classList.add('hidden');
+            document.getElementById('secao-historico').classList.add('hidden');
+            document.getElementById('secao-extrato').classList.add('hidden');
+            document.getElementById('secao-graficos').classList.add('hidden');
 
-      const desc = descInput.value.trim();
-      const valor = parseFloat(valorInput.value);
+            document.getElementById('secao-registo').classList.remove('flex');
+            document.getElementById('secao-historico').classList.remove('flex');
+            document.getElementById('secao-extrato').classList.remove('flex');
+            document.getElementById('secao-graficos').classList.remove('flex');
 
-      if (!desc || isNaN(valor)) {
-        alert('Por favor, preenche todos os campos corretamente.');
-        return;
-      }
+            document.getElementById('tab-registo').className = "px-1 py-1 font-semibold text-slate-400 hover:text-slate-200 transition truncate";
+            document.getElementById('tab-historico').className = "px-1 py-1 font-semibold text-slate-400 hover:text-slate-200 transition truncate";
+            document.getElementById('tab-extrato').className = "px-1 py-1 font-semibold text-slate-400 hover:text-slate-200 transition truncate";
+            document.getElementById('tab-graficos').className = "px-1 py-1 font-semibold text-slate-400 hover:text-slate-200 transition truncate";
 
-      apostas.push({ desc, valor });
-      saldoTotal += valor;
+            document.getElementById('nav-btn-registo').className = "flex flex-col items-center hover:text-slate-200 text-slate-400";
+            document.getElementById('nav-btn-historico').className = "flex flex-col items-center hover:text-slate-200 text-slate-400";
+            document.getElementById('nav-btn-extrato').className = "flex flex-col items-center hover:text-slate-200 text-slate-400";
+            document.getElementById('nav-btn-graficos').className = "flex flex-col items-center hover:text-slate-200 text-slate-400";
 
-      // Atualizar visualização do saldo
-      saldoDisplay.textContent = saldoTotal.toFixed(2) + ' €';
+            if (aba === 'registo') {
+                let el = document.getElementById('secao-registo');
+                el.classList.remove('hidden');
+                el.classList.add('flex');
+                document.getElementById('tab-registo').className = "px-1 py-1 font-semibold text-emerald-400 border-b-2 border-emerald-400 transition truncate";
+                document.getElementById('nav-btn-registo').className = "flex flex-col items-center text-emerald-400";
+            } else if (aba === 'historico') {
+                let el = document.getElementById('secao-historico');
+                el.classList.remove('hidden');
+                el.classList.add('flex');
+                document.getElementById('tab-historico').className = "px-1 py-1 font-semibold text-emerald-400 border-b-2 border-emerald-400 transition truncate";
+                document.getElementById('nav-btn-historico').className = "flex flex-col items-center text-emerald-400";
+                atualizarListaHistoricoCompleto();
+            } else if (aba === 'extrato') {
+                let el = document.getElementById('secao-extrato');
+                el.classList.remove('hidden');
+                el.classList.add('flex');
+                document.getElementById('tab-extrato').className = "px-1 py-1 font-semibold text-emerald-400 border-b-2 border-emerald-400 transition truncate";
+                document.getElementById('nav-btn-extrato').className = "flex flex-col items-center text-emerald-400";
+                preencherAnosFiltro();
+                atualizarExtrato();
+            } else if (aba === 'graficos') {
+                let el = document.getElementById('secao-graficos');
+                el.classList.remove('hidden');
+                el.classList.add('flex');
+                document.getElementById('tab-graficos').className = "px-1 py-1 font-semibold text-emerald-400 border-b-2 border-emerald-400 transition truncate";
+                document.getElementById('nav-btn-graficos').className = "flex flex-col items-center text-emerald-400";
+                atualizarGraficoLinhas();
+            }
+        }
 
-      // Atualizar histórico
-      if (apostas.length === 1) {
-        historicoDiv.innerHTML = '';
-      }
+        function calcularBancaTotal() {
+            let bancaCalculada = bancaInicial;
+            apostas.forEach(aposta => {
+                if (aposta.estado === "Venceu") {
+                    bancaCalculada += (aposta.valor * aposta.odd) - aposta.valor;
+                } else if (aposta.estado === "Perdeu") {
+                    bancaCalculada -= aposta.valor;
+                }
+            });
+            return bancaCalculada;
+        }
 
-      const item = document.createElement('div');
-      item.className = 'bg-slate-900 p-3 rounded-xl flex justify-between items-center border border-slate-700/50';
-      item.innerHTML = `<span>${desc}</span><span class="${valor >= 0 ? 'text-emerald-400' : 'text-rose-400'} font-semibold">${valor.toFixed(2)} €</span>`;
-      historicoDiv.prepend(item);
+        function gerarHtmlApostaCard(aposta, originalIndex) {
+            let badgeClass = "bg-amber-500/20 text-amber-400 border-amber-500/30";
+            let valorGanhoPerdidoStr = "---";
 
-      // Limpar campos
-      descInput.value = '';
-      valorInput.value = '';
-    }
-  </script>
+            if (aposta.estado === "Venceu") {
+                badgeClass = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+                let lucro = (aposta.valor * aposta.odd) - aposta.valor;
+                valorGanhoPerdidoStr = `<span class="text-emerald-400 font-bold">+${lucro.toFixed(2)} €</span>`;
+            } else if (aposta.estado === "Perdeu") {
+                badgeClass = "bg-rose-500/20 text-rose-400 border-rose-500/30";
+                valorGanhoPerdidoStr = `<span class="text-rose-400 font-bold">-${aposta.valor.toFixed(2)} €</span>`;
+            }
+
+            return `
+                <div class="bg-slate-800 border border-slate-700/60 p-2.5 rounded-xl flex justify-between items-center shrink-0">
+                    <div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-[9px] bg-slate-700 px-1 py-0.5 rounded text-slate-300 font-medium">${aposta.modalidade}</span>
+                            <span class="text-xs font-bold text-white">${aposta.equipaA} vs ${aposta.equipaB}</span>
+                            <span class="text-[9px] px-1.5 py-0.5 rounded-full border ${badgeClass}">${aposta.estado}</span>
+                        </div>
+                        <div class="text-[10px] text-slate-400 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                            <span>Data: ${aposta.data}</span>
+                            <span>Aposta: <b>${aposta.valor.toFixed(2)} €</b></span>
+                            <span>ODD: <b>${aposta.odd.toFixed(2)}</b></span>
+                            <span>Resultado: <b>${valorGanhoPerdidoStr}</b></span>
+                        </div>
+                    </div>
+                    <div class="flex gap-1">
+                        <button onclick="editarAposta(${originalIndex})" class="bg-slate-700 hover:bg-slate-600 text-slate-200 p-1.5 rounded-lg text-xs" title="Editar"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="apagarAposta(${originalIndex})" class="bg-rose-500/20 hover:bg-rose-500/40 text-rose-400 p-1.5 rounded-lg text-xs" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function atualizarInterface() {
+            let bancaCalculada = calcularBancaTotal();
+            let apostasComIndex = apostas.map((a, idx) => ({ ...a, originalIndex: idx }));
+            apostasComIndex.sort((a, b) => new Date(b.data) - new Date(a.data));
+
+            let hoje = new Date();
+            let limiteDias = new Date();
+            limiteDias.setDate(hoje.getDate() - 7);
+            let apostasRecentes = apostasComIndex.filter(a => new Date(a.data) >= limiteDias);
+
+            let htmlRecentes = "";
+            if (apostasRecentes.length === 0) {
+                htmlRecentes = `<div class="text-center py-4 text-slate-500 text-xs italic">Ainda não existem apostas nos últimos 7 dias.</div>`;
+            } else {
+                apostasRecentes.forEach(item => {
+                    htmlRecentes += gerarHtmlApostaCard(item, item.originalIndex);
+                });
+            }
+
+            document.getElementById("banca-atual").innerText = bancaCalculada.toFixed(2) + " €";
+            document.getElementById("lista-recentes").innerHTML = htmlRecentes;
+            document.getElementById("contador-recentes").innerText = apostasRecentes.length + (apostasRecentes.length === 1 ? " registo" : " registos");
+        }
+
+        function atualizarListaHistoricoCompleto() {
+            let apostasComIndex = apostas.map((a, idx) => ({ ...a, originalIndex: idx }));
+            apostasComIndex.sort((a, b) => new Date(b.data) - new Date(a.data));
+
+            let htmlHistorico = "";
+            if (apostasComIndex.length === 0) {
+                htmlHistorico = `<div class="text-center py-5 text-slate-500 text-xs italic">Ainda não existem apostas registadas.</div>`;
+            } else {
+                apostasComIndex.forEach(item => {
+                    htmlHistorico += gerarHtmlApostaCard(item, item.originalIndex);
+                });
+            }
+
+            document.getElementById("lista-historico-completo").innerHTML = htmlHistorico;
+            document.getElementById("contador-historico").innerText = apostasComIndex.length + (apostasComIndex.length === 1 ? " registo" : " registos");
+        }
+
+        function preencherAnosFiltro() {
+            let anos = new Set();
+            apostas.forEach(a => {
+                if (a.data) anos.add(a.data.split('-')[0]);
+            });
+            let selectAno = document.getElementById('filtro-ano');
+            let anoAtualSel = selectAno.value;
+            let html = '<option value="todos">Todos</option>';
+            anos.forEach(ano => {
+                html += `<option value="${ano}">${ano}</option>`;
+            });
+            selectAno.innerHTML = html;
+            selectAno.value = anos.has(anoAtualSel) ? anoAtualSel : 'todos';
+        }
+
+        function obterSemanaDoMes(dataStr) {
+            let dia = parseInt(dataStr.split('-')[2]);
+            if (dia <= 7) return 1;
+            if (dia <= 14) return 2;
+            if (dia <= 21) return 3;
+            return 4;
+        }
+
+        function obterDadosExtratoFiltrados() {
+            let filtroAno = document.getElementById('filtro-ano').value;
+            let filtroMes = document.getElementById('filtro-mes').value;
+            let filtroSemana = document.getElementById('filtro-semana').value;
+
+            let saldoAcumuladoGlobal = bancaInicial;
+            let saldoAnualCalc = 0;
+            let saldoMensalCalc = 0;
+            let saldoSemanalCalc = 0;
+
+            let movimentosFiltrados = [];
+            let apostasOrdenadas = [...apostas].sort((a, b) => new Date(a.data) - new Date(b.data));
+
+            apostasOrdenadas.forEach((aposta) => {
+                if (aposta.estado === "Pendente") return;
+
+                let [ano, mes, dia] = aposta.data.split('-');
+                let semana = obterSemanaDoMes(aposta.data);
+
+                let impacto = 0;
+                let creditoNum = 0;
+                let debitoNum = 0;
+
+                if (aposta.estado === "Venceu") {
+                    let lucro = (aposta.valor * aposta.odd) - aposta.valor;
+                    impacto = lucro;
+                    creditoNum = lucro;
+                } else if (aposta.estado === "Perdeu") {
+                    impacto = -aposta.valor;
+                    debitoNum = aposta.valor;
+                }
+
+                saldoAcumuladoGlobal += impacto;
+
+                let matchAno = (filtroAno === 'todos' || ano === filtroAno);
+                let matchMes = matchAno && (filtroMes === 'todos' || parseInt(mes) === parseInt(filtroMes));
+                let matchSemana = matchMes && (filtroSemana === 'todas' || semana === parseInt(filtroSemana));
+
+                if (matchAno) saldoAnualCalc += impacto;
+                if (matchMes) saldoMensalCalc += impacto;
+                if (matchSemana) saldoSemanalCalc += impacto;
+
+                if (matchAno && matchMes && matchSemana) {
+                    movimentosFiltrados.push({
+                        data: aposta.data,
+                        descricao: `${aposta.modalidade}: ${aposta.equipaA} vs ${aposta.equipaB}`,
+                        debito: debitoNum,
+                        credito: creditoNum,
+                        acumulado: saldoAcumuladoGlobal
+                    });
+                }
+            });
+
+            return {
+                movimentos: movimentosFiltrados,
+                saldoAnual: saldoAnualCalc,
+                saldoMensal: saldoMensalCalc,
+                saldoSemanal: saldoSemanalCalc
+            };
+        }
+
+        function atualizarExtrato() {
+            let dados = obterDadosExtratoFiltrados();
+            let htmlExtrato = `
+                <tr class="border-b border-slate-800 bg-slate-900/40">
+                    <td class="py-1 px-1 text-slate-300 font-medium">Banca Inicial Configurada</td>
+                    <td class="py-1 px-1 text-slate-500">-</td>
+                    <td class="py-1 px-1 text-emerald-400">+${bancaInicial.toFixed(2)} €</td>
+                    <td class="py-1 px-1 text-right font-bold text-white">${bancaInicial.toFixed(2)} €</td>
+                </tr>
+            `;
+
+            dados.movimentos.forEach((m) => {
+                let creditoStr = m.credito > 0 ? `+${m.credito.toFixed(2)} €` : "-";
+                let debitoStr = m.debito > 0 ? `-${m.debito.toFixed(2)} €` : "-";
+                let corTextoAcumulado = m.acumulado >= bancaInicial ? 'text-emerald-400' : 'text-rose-400';
+
+                htmlExtrato += `
+                    <tr class="border-b border-slate-800">
+                        <td class="py-1 px-1"><b>${m.data}</b><br><span class="text-[8px] text-slate-400">${m.descricao}</span></td>
+                        <td class="py-1 px-1 text-rose-400">${debitoStr}</td>
+                        <td class="py-1 px-1 text-emerald-400">${creditoStr}</td>
+                        <td class="py-1 px-1 text-right font-bold ${corTextoAcumulado}">${m.acumulado.toFixed(2)} €</td>
+                    </tr>
+                `;
+            });
+
+            document.getElementById("tabela-extrato").innerHTML = htmlExtrato;
+            document.getElementById("extrato-contador").innerText = dados.movimentos.length + (dados.movimentos.length === 1 ? " movimento" : " movimentos");
+
+            document.getElementById("saldo-anual").innerText = (dados.saldoAnual >= 0 ? "+" : "") + dados.saldoAnual.toFixed(2) + " €";
+            document.getElementById("saldo-anual").className = `text-xs font-bold mt-0.5 ${dados.saldoAnual >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+
+            document.getElementById("saldo-mensal").innerText = (dados.saldoMensal >= 0 ? "+" : "") + dados.saldoMensal.toFixed(2) + " €";
+            document.getElementById("saldo-mensal").className = `text-xs font-bold mt-0.5 ${dados.saldoMensal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+
+            document.getElementById("saldo-semanal").innerText = (dados.saldoSemanal >= 0 ? "+" : "") + dados.saldoSemanal.toFixed(2) + " €";
+            document.getElementById("saldo-semanal").className = `text-xs font-bold mt-0.5 ${dados.saldoSemanal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+        }
+
+        function gerarPdfExtrato() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            let dados = obterDadosExtratoFiltrados();
+            let filtroAno = document.getElementById('filtro-ano').value;
+            let filtroMes = document.getElementById('filtro-mes').value;
+            let filtroSemana = document.getElementById('filtro-semana').value;
+
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(18);
+            doc.setTextColor(16, 185, 129);
+            doc.text("Apostas do Zé - Extrato de Conta", 14, 20);
+
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(10);
+            doc.setTextColor(100, 100, 100);
+            doc.text(`Data de Emissão: ${new Date().toLocaleDateString('pt-PT')}`, 14, 26);
+            doc.text(`Filtros Aplicados -> Ano: ${filtroAno} | Mês: ${filtroMes} | Semana: ${filtroSemana}`, 14, 32);
+
+            doc.setFillColor(241, 245, 249);
+            doc.roundedRect(14, 38, 182, 18, 2, 2, 'F');
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(9);
+            doc.setTextColor(30, 41, 59);
+            doc.text(`Saldo Anual: ${dados.saldoAnual >= 0 ? '+' : ''}${dados.saldoAnual.toFixed(2)} EUR`, 18, 49);
+            doc.text(`Saldo Mensal: ${dados.saldoMensal >= 0 ? '+' : ''}${dados.saldoMensal.toFixed(2)} EUR`, 78, 49);
+            doc.text(`Saldo Semanal: ${dados.saldoSemanal >= 0 ? '+' : ''}${dados.saldoSemanal.toFixed(2)} EUR`, 138, 49);
+
+            let y = 65;
+            doc.setFontSize(11);
+            doc.text("Movimentos Detalhados", 14, y);
+            y += 6;
+
+            doc.setFillColor(30, 41, 59);
+            doc.rect(14, y, 182, 8, 'F');
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(9);
+            doc.setTextColor(255, 255, 255);
+            doc.text("Data / Descrição", 18, y + 5.5);
+            doc.text("Débito", 110, y + 5.5);
+            doc.text("Crédito", 138, y + 5.5);
+            doc.text("Acumulado", 175, y + 5.5, { align: "right" });
+
+            y += 8;
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(9);
+
+            doc.setTextColor(50, 50, 50);
+            doc.text("Banca Inicial Configurada", 18, y + 5);
+            doc.text("-", 110, y + 5);
+            doc.text(`+${bancaInicial.toFixed(2)} €`, 138, y + 5);
+            doc.text(`${bancaInicial.toFixed(2)} €`, 190, y + 5, { align: "right" });
+            y += 8;
+
+            dados.movimentos.forEach((m, idx) => {
+                if (y > 275) {
+                    doc.addPage();
+                    y = 20;
+                }
+
+                if (idx % 2 === 0) {
+                    doc.setFillColor(248, 250, 252);
+                    doc.rect(14, y - 2, 182, 8, 'F');
+                }
+
+                doc.setTextColor(30, 30, 30);
+                doc.text(`${m.data} - ${m.descricao}`, 18, y + 3);
+                
+                let debitoStr = m.debito > 0 ? `-${m.debito.toFixed(2)} €` : "-";
+                let creditoStr = m.credito > 0 ? `+${m.credito.toFixed(2)} €` : "-";
+
+                doc.text(debitoStr, 110, y + 3);
+                doc.text(creditoStr, 138, y + 3);
+                doc.text(`${m.acumulado.toFixed(2)} €`, 190, y + 3, { align: "right" });
+
+                y += 8;
+            });
+
+            doc.save(`extrato_apostas_${filtroAno}_${filtroMes}.pdf`);
+        }
+
+        function atualizarGraficoLinhas() {
+            let container = document.getElementById("grafico-linhas-svg-container");
+            let labelsContainer = document.getElementById("grafico-eixo-x-labels");
+
+            let dataInicioStr = document.getElementById('grafico-data-inicio').value;
+            let dataFimStr = document.getElementById('grafico-data-fim').value;
+
+            if (!dataInicioStr || !dataFimStr) {
+                container.innerHTML = `<div class="w-full text-center text-slate-500 text-xs italic my-auto">Selecione o intervalo de datas.</div>`;
+                return;
+            }
+
+            let dInicio = new Date(dataInicioStr);
+            let dFim = new Date(dataFimStr);
+
+            if (dInicio > dFim) {
+                container.innerHTML = `<div class="w-full text-center text-rose-400 text-xs italic my-auto">A data de início deve ser anterior à data de fim.</div>`;
+                return;
+            }
+
+            let saldoCorrente = bancaInicial;
+            let apostasOrdenadas = [...apostas].sort((a, b) => new Date(a.data) - new Date(b.data));
+
+            apostasOrdenadas.forEach(a => {
+                if (a.data < dataInicioStr) {
+                    if (a.estado === "Venceu") saldoCorrente += (a.valor * a.odd) - a.valor;
+                    else if (a.estado === "Perdeu") saldoCorrente -= a.valor;
+                }
+            });
+
+            let pontosGrafico = [];
+            let minBanca = bancaInicial;
+            let maxBanca = bancaInicial;
+
+            let impactoPorData = {};
+            apostasOrdenadas.forEach(a => {
+                if (a.data >= dataInicioStr && a.data <= dataFimStr) {
+                    let impacto = 0;
+                    if (a.estado === "Venceu") impacto = (a.valor * a.odd) - a.valor;
+                    else if (a.estado === "Perdeu") impacto = -a.valor;
+
+                    if (!impactoPorData[a.data]) impactoPorData[a.data] = 0;
+                    impactoPorData[a.data] += impacto;
+                }
+            });
+
+            let datasComAposta = Object.keys(impactoPorData).sort();
+
+            if (datasComAposta.length === 0) {
+                container.innerHTML = `<div class="w-full text-center text-slate-500 text-xs italic my-auto">Sem apostas registadas neste intervalo.</div>`;
+                labelsContainer.innerHTML = `<span>${dataInicioStr}</span><span>${dataFimStr}</span>`;
+                return;
+            }
+
+            datasComAposta.forEach(dataStr => {
+                saldoCorrente += impactoPorData[dataStr];
+                pontosGrafico.push({ data: dataStr, saldo: saldoCorrente });
+                if (saldoCorrente < minBanca) minBanca = saldoCorrente;
+                if (saldoCorrente > maxBanca) maxBanca = saldoCorrente;
+            });
+
+            minBanca = Math.floor(minBanca / 5) * 5;
+            maxBanca = Math.ceil(maxBanca / 5) * 5;
+            if (minBanca === maxBanca) maxBanca += 5;
+
+            let spanBanca = maxBanca - minBanca;
+            let svgWidth = 360;
+            let svgHeight = 110;
+            let pontosSvg = "";
+            let passosX = pontosGrafico.length > 1 ? svgWidth / (pontosGrafico.length - 1) : svgWidth / 2;
+
+            pontosGrafico.forEach((item, index) => {
+                let x = pontosGrafico.length === 1 ? svgWidth / 2 : index * passosX;
+                let y = svgHeight - ((item.saldo - minBanca) / spanBanca) * (svgHeight - 16) - 8;
+                pontosSvg += `${x},${y} `;
+            });
+
+            let yPosBancaInicial = svgHeight - ((bancaInicial - minBanca) / spanBanca) * (svgHeight - 16) - 8;
+
+            let linhasGrelhaSvg = `
+                <line x1="0" y1="${yPosBancaInicial}" x2="${svgWidth}" y2="${yPosBancaInicial}" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="4,4" />
+            `;
+
+            for (let val = minBanca; val <= maxBanca; val += 5) {
+                if (val === bancaInicial) continue;
+                let yPos = svgHeight - ((val - minBanca) / spanBanca) * (svgHeight - 16) - 8;
+                linhasGrelhaSvg += `<line x1="0" y1="${yPos}" x2="${svgWidth}" y2="${yPos}" stroke="#334155" stroke-width="0.5" />`;
+            }
+
+            let diasSemanaNomes = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+            let htmlLabels = "";
+            if (pontosGrafico.length > 0) {
+                let primeiroDiaObj = new Date(pontosGrafico[0].data);
+                let ultimoDiaObj = new Date(pontosGrafico[pontosGrafico.length - 1].data);
+                let dSemanaInicio = diasSemanaNomes[primeiroDiaObj.getDay()];
+                let dSemanaFim = diasSemanaNomes[ultimoDiaObj.getDay()];
+                htmlLabels = `<span>${pontosGrafico[0].data.substring(5)} (${dSemanaInicio})</span><span>${pontosGrafico[pontosGrafico.length - 1].data.substring(5)} (${dSemanaFim})</span>`;
+            }
+
+            container.innerHTML = `
+                <svg viewBox="0 0 ${svgWidth} ${svgHeight}" class="w-full h-full overflow-visible">
+                    ${linhasGrelhaSvg}
+                    <polyline fill="none" stroke="#10b981" stroke-width="2.5" points="${pontosSvg}" stroke-linecap="round" stroke-linejoin="round" />
+                    ${pontosGrafico.map((item, index) => {
+                        let x = pontosGrafico.length === 1 ? svgWidth / 2 : index * passosX;
+                        let y = svgHeight - ((item.saldo - minBanca) / spanBanca) * (svgHeight - 16) - 8;
+                        let corPonto = item.saldo < bancaInicial ? '#f43f5e' : '#34d399';
+                        let dObj = new Date(item.data);
+                        let dSemana = diasSemanaNomes[dObj.getDay()];
+                        return `<circle cx="${x}" cy="${y}" r="3.5" fill="${corPonto}" class="cursor-pointer">
+                            <title>${item.data} (${dSemana}): ${item.saldo.toFixed(2)}€ (Inicial: ${bancaInicial.toFixed(2)}€)</title>
+                        </circle>`;
+                    }).join('')}
+                </svg>
+            `;
+            labelsContainer.innerHTML = htmlLabels;
+        }
+
+        async function guardarAposta() {
+            let modalidade = document.getElementById("modalidade-aposta").value;
+            let equipaA = document.getElementById("equipa-a").value.trim();
+            let equipaB = document.getElementById("equipa-b").value.trim();
+            let valor = parseFloat(document.getElementById("valor-aposta").value);
+            let odd = parseFloat(document.getElementById("odd-aposta").value);
+            let estado = document.getElementById("estado-aposta").value;
+            let data = document.getElementById("data-aposta").value;
+            let editIndex = parseInt(document.getElementById("edit-index").value);
+
+            if (!equipaA || !equipaB || isNaN(valor) || isNaN(odd) || !data) {
+                alert("Por favor, preencha todos os campos corretamente.");
+                return;
+            }
+
+            if (editIndex === -1) {
+                apostas.push({ modalidade, equipaA, equipaB, valor, odd, estado, data });
+            } else {
+                apostas[editIndex] = { modalidade, equipaA, equipaB, valor, odd, estado, data };
+                document.getElementById("edit-index").value = "-1";
+                document.getElementById("form-title").innerHTML = `<i class="fa-solid fa-plus-circle"></i> Registar Nova Aposta`;
+                document.getElementById("btn-salvar").innerText = "Concluir e Registar";
+            }
+
+            document.getElementById("equipa-a").value = "";
+            document.getElementById("equipa-b").value = "";
+            document.getElementById("valor-aposta").value = "";
+            document.getElementById("odd-aposta").value = "";
+            document.getElementById("estado-aposta").value = "Pendente";
+            document.getElementById("modalidade-aposta").value = "Futebol";
+
+            await guardarDadosNoDrive();
+            atualizarInterface();
+        }
+
+        function editarAposta(index) {
+            let a = apostas[index];
+            document.getElementById("modalidade-aposta").value = a.modalidade;
+            document.getElementById("equipa-a").value = a.equipaA;
+            document.getElementById("equipa-b").value = a.equipaB;
+            document.getElementById("valor-aposta").value = a.valor;
+            document.getElementById("odd-aposta").value = a.odd;
+            document.getElementById("estado-aposta").value = a.estado;
+            document.getElementById("data-aposta").value = a.data;
+            document.getElementById("edit-index").value = index;
+
+            document.getElementById("form-title").innerHTML = `<i class="fa-solid fa-pen-to-square"></i> A Editar Aposta #${index + 1}`;
+            document.getElementById("btn-salvar").innerText = "Atualizar Registo";
+            mudarAba('registo');
+        }
+
+        async function apagarAposta(index) {
+            if (confirm("Tem certeza que deseja apagar este registo?")) {
+                apostas.splice(index, 1);
+                await guardarDadosNoDrive();
+                atualizarInterface();
+            }
+        }
+
+        function abrirConfigBanca() {
+            let novoValor = prompt("Introduza o valor inicial da Banca:", bancaInicial);
+            if (novoValor !== null && !isNaN(parseFloat(novoValor))) {
+                bancaInicial = parseFloat(novoValor);
+                atualizarInterface();
+            }
+        }
+
+        document.getElementById('secao-registo').classList.add('flex');
+        carregarDadosDoDrive();
+    </script>
 </body>
 </html>
