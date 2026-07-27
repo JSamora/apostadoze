@@ -46,7 +46,7 @@
                 <button onclick="carregarDadosDoDrive()" class="bg-slate-700 hover:bg-slate-600 p-2.5 rounded-full text-xs text-emerald-400 transition" title="Sincronizar com o Drive">
                     <i class="fa-solid fa-rotate" id="icon-sync"></i>
                 </button>
-                <button onclick="abrirConfigBanca()" class="bg-slate-700 hover:bg-slate-600 p-2.5 rounded-full text-xs text-slate-200 transition" title="Definições / Saldo Inicial">
+                <button onclick="abrirConfigBanca()" class="bg-slate-700 hover:bg-slate-600 p-2.5 rounded-full text-xs text-slate-200 transition" title="Definições / Gestão de Caixa">
                     <i class="fa-solid fa-gear"></i>
                 </button>
             </div>
@@ -64,9 +64,9 @@
         <!-- Conteúdo Global da App -->
         <div class="flex-1 overflow-hidden p-3 flex flex-col">
             
-            <!-- Painel de Banca Global com Botões Rápidos de Caixa -->
+            <!-- Painel de Banca Global (Simplificado e Compacto) -->
             <div class="bg-gradient-to-r from-emerald-600 to-teal-700 p-3.5 rounded-2xl shadow-lg text-white mb-2.5 shrink-0">
-                <div class="flex justify-between items-center mb-2">
+                <div class="flex justify-between items-center">
                     <div>
                         <p class="text-[10px] uppercase tracking-wider opacity-80">Banca Atual / Saldo Total</p>
                         <h2 id="banca-atual" class="text-2xl font-extrabold mt-0.5">100.00 €</h2>
@@ -74,15 +74,6 @@
                     <div class="bg-emerald-800/40 px-2.5 py-1 rounded-xl text-[10px] text-emerald-100 flex items-center gap-1">
                         <i class="fa-solid fa-cloud"><span>Drive</span></i>
                     </div>
-                </div>
-                <!-- Botões de Depósito e Levantamento Rápidos -->
-                <div class="grid grid-cols-2 gap-2 pt-1 border-t border-emerald-500/30">
-                    <button onclick="abrirModalCaixa('deposito')" class="bg-emerald-800/60 hover:bg-emerald-800 text-emerald-200 text-xs font-semibold py-1.5 px-3 rounded-xl transition flex items-center justify-center gap-1.5 shadow">
-                        <i class="fa-solid fa-arrow-down text-emerald-300"></i> Depositar
-                    </button>
-                    <button onclick="abrirModalCaixa('levantamento')" class="bg-rose-900/40 hover:bg-rose-900/60 text-rose-200 text-xs font-semibold py-1.5 px-3 rounded-xl transition flex items-center justify-center gap-1.5 shadow">
-                        <i class="fa-solid fa-arrow-up text-rose-300"></i> Levantar
-                    </button>
                 </div>
             </div>
 
@@ -348,26 +339,61 @@
         </div>
     </div>
 
-    <!-- MODAL DE DEPÓSITO / LEVANTAMENTO -->
-    <div id="modal-caixa" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+    <!-- MODAL DE DEFINIÇÕES E GESTÃO DE CAIXA -->
+    <div id="modal-definicoes" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
         <div class="bg-slate-800 border border-slate-700 w-full max-w-xs rounded-2xl p-4 space-y-3 shadow-2xl">
-            <h3 id="modal-caixa-titulo" class="text-sm font-bold text-emerald-400 flex items-center gap-2">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+                <h3 class="text-sm font-bold text-emerald-400 flex items-center gap-2">
+                    <i class="fa-solid fa-gear"></i> Definições e Caixa
+                </h3>
+                <button onclick="fecharConfigBanca()" class="text-slate-400 hover:text-white text-xs"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <div class="space-y-2.5">
+                <!-- Alterar Saldo Inicial -->
+                <div class="bg-slate-900 p-2.5 rounded-xl border border-slate-700">
+                    <label class="text-[10px] text-slate-400 block mb-1">Saldo Inicial Base (€)</label>
+                    <div class="flex gap-2">
+                        <input type="number" step="0.01" id="input-saldo-inicial" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                        <button onclick="atualizarSaldoInicial()" class="bg-slate-700 hover:bg-slate-600 text-emerald-400 font-semibold px-3 py-1.5 rounded-lg text-xs transition">Salvar</button>
+                    </div>
+                </div>
+
+                <!-- Botões de Depósito e Levantamento -->
+                <div class="grid grid-cols-2 gap-2 pt-1">
+                    <button onclick="abrirModalCaixaSub('deposito')" class="bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 text-emerald-300 text-xs font-semibold py-2 px-2 rounded-xl transition flex items-center justify-center gap-1.5 shadow">
+                        <i class="fa-solid fa-arrow-down"></i> Depositar
+                    </button>
+                    <button onclick="abrirModalCaixaSub('levantamento')" class="bg-rose-900/30 hover:bg-rose-900/50 border border-rose-500/40 text-rose-300 text-xs font-semibold py-2 px-2 rounded-xl transition flex items-center justify-center gap-1.5 shadow">
+                        <i class="fa-solid fa-arrow-up"></i> Levantar
+                    </button>
+                </div>
+            </div>
+
+            <button onclick="fecharConfigBanca()" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-2 rounded-lg text-xs transition mt-2">Fechar</button>
+        </div>
+    </div>
+
+    <!-- MODAL SECUNDÁRIO DE VALOR (DEPÓSITO / LEVANTAMENTO) -->
+    <div id="modal-caixa-sub" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm hidden flex items-center justify-center p-4 z-60">
+        <div class="bg-slate-800 border border-slate-700 w-full max-w-xs rounded-2xl p-4 space-y-3 shadow-2xl">
+            <h3 id="modal-sub-titulo" class="text-sm font-bold text-emerald-400 flex items-center gap-2">
                 <i class="fa-solid fa-wallet"></i> Registar Depósito
             </h3>
-            <input type="hidden" id="modal-caixa-tipo" value="deposito">
+            <input type="hidden" id="modal-sub-tipo" value="deposito">
             <div class="space-y-2">
                 <div>
                     <label class="text-[10px] text-slate-400">Valor (€)</label>
-                    <input type="number" step="0.01" id="modal-caixa-valor" placeholder="20.00" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+                    <input type="number" step="0.01" id="modal-sub-valor" placeholder="20.00" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-emerald-500">
                 </div>
                 <div>
                     <label class="text-[10px] text-slate-400">Data</label>
-                    <input type="date" id="modal-caixa-data" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+                    <input type="date" id="modal-sub-data" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-emerald-500">
                 </div>
             </div>
             <div class="grid grid-cols-2 gap-2 pt-1">
-                <button onclick="fecharModalCaixa()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-2 rounded-lg text-xs transition">Cancelar</button>
-                <button onclick="confirmarMovimentoCaixa()" class="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-2 rounded-lg text-xs transition">Confirmar</button>
+                <button onclick="voltarConfigCaixa()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-2 rounded-lg text-xs transition">Voltar</button>
+                <button onclick="confirmarMovimentoCaixaSub()" class="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-2 rounded-lg text-xs transition">Confirmar</button>
             </div>
         </div>
     </div>
