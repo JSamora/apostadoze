@@ -1,4 +1,4 @@
-const CACHE_NAME = 'apostas-ze-v2';
+const CACHE_NAME = 'apostas-ze-v3';
 
 // Ficheiros essenciais a guardar em cache para funcionamento offline
 const ASSETS_TO_CACHE = [
