@@ -1,584 +1,715 @@
-const DRIVE_API_URL = "https://script.google.com/macros/s/AKfycbxxjoFddFM8AcaCS42YHie1wwNMTmw8YqNobmsUrQZWWgr1FqUKMdKuCV8YQl0fhm9K-A/exec";
+// ==========================================
+// APOSTAS DO ZÉ - SCRIPT PRINCIPAL UNIFICADO
+// ==========================================
 
-let bancaInicial = 100.00;
-let apostas = [];
+let dadosApp = {
+    saldoInicial: 100.00,
+    apostas: [],
+    raspadinhas: [],
+    movimentosCaixa: [] // Depósitos e Levantamentos
+};
 
-document.getElementById('data-aposta').valueAsDate = new Date();
+// Inicialização ao carregar a página
+document.addEventListener('DOMContentLoaded', () => {
+    carregarDadosLocais();
+    preencherDataAtual();
+    renderizarTudo();
+});
 
-function inicializarDatasMesAtual() {
-    let hoje = new Date();
-    let ano = hoje.getFullYear();
-    let mes = String(hoje.getMonth() + 1).padStart(2, '0');
-    let primeiroDia = `${ano}-${mes}-01`;
-    let ultimoDiaObj = new Date(ano, hoje.getMonth() + 1, 0);
-    let ultimoDia = `${ano}-${mes}-${String(ultimoDiaObj.getDate()).padStart(2, '0')}`;
-
-    document.getElementById('grafico-data-inicio').value = primeiroDia;
-    document.getElementById('grafico-data-fim').value = ultimoDia;
+function preencherDataAtual() {
+    const hoje = new Date().toISOString().split('T')[0];
+    const elAposta = document.getElementById('data-aposta');
+    const elRaspadinha = document.getElementById('raspadinha-data');
+    if (elAposta && !elAposta.value) elAposta.value = hoje;
+    if (elRaspadinha && !elRaspadinha.value) elRaspadinha.value = hoje;
 }
-inicializarDatasMesAtual();
 
-async function carregarDadosDoDrive() {
-    let icon = document.getElementById('icon-sync');
+// Gestão de Abas
+const abasValidas = ['registo', 'raspadinhas', 'historico', 'extrato', 'graficos'];
+function mudarAba(abaDestino) {
+    abasValidas.forEach(aba => {
+        const secao = document.getElementById(`secao-${aba}`);
+        const btnTopo = document.getElementById(`tab-${aba}`);
+        const btnRodape = document.getElementById(`nav-btn-${aba}`);
+
+        if (aba === abaDestino) {
+            if (secao) secao.classList.remove('hidden');
+            if (btnTopo) {
+                btnTopo.classList.add('text-emerald-400', 'border-b-2', 'border-emerald-400');
+                btnTopo.classList.remove('text-slate-400');
+            }
+            if (btnRodape) {
+                btnRodape.classList.add('text-emerald-400');
+                btnRodape.classList.remove('text-slate-400');
+            }
+        } else {
+            if (secao) secao.classList.add('hidden');
+            if (btnTopo) {
+                btnTopo.classList.remove('text-emerald-400', 'border-b-2', 'border-emerald-400');
+                btnTopo.classList.add('text-slate-400');
+            }
+            if (btnRodape) {
+                btnRodape.classList.remove('text-emerald-400');
+                btnRodape.classList.add('text-slate-400');
+            }
+        }
+    });
+}
+
+// Armazenamento Local (Offline-First)
+function carregarDadosLocais() {
+    const salvo = localStorage.getItem('apostas_do_ze_dados');
+    if (salvo) {
+        try {
+            const parsed = JSON.parse(salvo);
+            dadosApp.saldoInicial = parsed.saldoInicial ?? 100.00;
+            dadosApp.apostas = parsed.apostas || [];
+            dadosApp.raspadinhas = parsed.raspadinhas || [];
+            dadosApp.movimentosCaixa = parsed.movimentosCaixa || [];
+        } catch (e) {
+            console.error('Erro ao carregar dados locais:', e);
+        }
+    }
+}
+
+function guardarDadosLocais() {
+    localStorage.setItem('apostas_do_ze_dados', JSON.stringify(dadosApp));
+}
+
+// Simulação de Sincronização com o Drive / Nuvem
+function carregarDadosDoDrive() {
+    const icon = document.getElementById('icon-sync');
     if (icon) icon.classList.add('fa-spin');
     
-    try {
-        let resposta = await fetch(DRIVE_API_URL);
-        let dados = await resposta.json();
-        if (Array.isArray(dados)) {
-            apostas = dados;
-        }
-    } catch (erro) {
-        console.error("Erro ao carregar dados do Drive:", erro);
-    } finally {
+    setTimeout(() => {
+        carregarDadosLocais();
+        renderizarTudo();
         if (icon) icon.classList.remove('fa-spin');
-        atualizarInterface();
+        alert('Dados sincronizados com sucesso!');
+    }, 800);
+}
+
+// Definições / Banca / Depósitos / Levantamentos
+function abrirConfigBanca() {
+    const novoSaldo = prompt('Insira o valor do Saldo Inicial base (€):', dadosApp.saldoInicial);
+    if (novoSaldo !== null) {
+        const val = parseFloat(novoSaldo);
+        if (!isNaN(val) && val >= 0) {
+            dadosApp.saldoInicial = val;
+            guardarDadosLocais();
+            renderizarTudo();
+            alert('Saldo inicial atualizado com sucesso!');
+            return;
+        } else {
+            alert('Valor inválido.');
+        }
+    }
+
+    // Opcional: Registar depósito ou levantamento rápido
+    const tipoMov = prompt('Deseja registar um Depósito ou Levantamento? Insira "deposito" ou "levantamento" (ou deixe vazio para cancelar):');
+    if (tipoMov && (tipoMov.toLowerCase() === 'deposito' || tipoMov.toLowerCase() === 'levantamento')) {
+        const valMov = prompt(`Insira o valor do ${tipoMov.toLowerCase() === 'deposito' ? 'Depósito' : 'Levantamento'} (€):`);
+        const valorNum = parseFloat(valMov);
+        if (!isNaN(valorNum) && valorNum > 0) {
+            dadosApp.movimentosCaixa.push({
+                tipo: 'caixa',
+                subtipo: tipoMov.toLowerCase(),
+                valor: valorNum,
+                data: new Date().toISOString().split('T')[0]
+            });
+            guardarDadosLocais();
+            renderizarTudo();
+            alert('Movimento de caixa registado com sucesso!');
+        }
     }
 }
 
-async function guardarDadosNoDrive() {
-    try {
-        await fetch(DRIVE_API_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(apostas)
-        });
-    } catch (erro) {
-        console.error("Erro ao guardar dados no Drive:", erro);
+// -----------------------------------------
+// GESTÃO DE APOSTAS
+// -----------------------------------------
+function guardarAposta() {
+    const modalidade = document.getElementById('modalidade-aposta').value;
+    const estado = document.getElementById('estado-aposta').value;
+    const equipaA = document.getElementById('equipa-a').value.trim();
+    const equipaB = document.getElementById('equipa-b').value.trim();
+    const valor = parseFloat(document.getElementById('valor-aposta').value);
+    const odd = parseFloat(document.getElementById('odd-aposta').value);
+    const data = document.getElementById('data-aposta').value || new Date().toISOString().split('T')[0];
+    const editIndex = parseInt(document.getElementById('edit-index').value);
+
+    if (!equipaA || !equipaB || isNaN(valor) || valor <= 0 || isNaN(odd) || odd <= 1) {
+        alert('Por favor, preencha todos os campos corretamente (ODD deve ser superior a 1.0).');
+        return;
+    }
+
+    const apostaObj = {
+        tipo: 'aposta',
+        modalidade,
+        estado,
+        equipaA,
+        equipaB,
+        valor,
+        odd,
+        data,
+        retornoPotencial: valor * odd
+    };
+
+    if (editIndex > -1) {
+        dadosApp.apostas[editIndex] = apostaObj;
+        document.getElementById('edit-index').value = -1;
+        document.getElementById('form-title').innerHTML = '<i class="fa-solid fa-plus-circle"></i> Registar Nova Aposta';
+        document.getElementById('btn-salvar').innerText = 'Concluir e Registar';
+    } else {
+        dadosApp.apostas.push(apostaObj);
+    }
+
+    guardarDadosLocais();
+    limparFormularioAposta();
+    renderizarTudo();
+    alert('Aposta guardada com sucesso!');
+}
+
+function limparFormularioAposta() {
+    document.getElementById('equipa-a').value = '';
+    document.getElementById('equipa-b').value = '';
+    document.getElementById('valor-aposta').value = '';
+    document.getElementById('odd-aposta').value = '';
+    preencherDataAtual();
+}
+
+function editarAposta(index) {
+    const a = dadosApp.apostas[index];
+    if (!a) return;
+    document.getElementById('modalidade-aposta').value = a.modalidade;
+    document.getElementById('estado-aposta').value = a.estado;
+    document.getElementById('equipa-a').value = a.equipaA;
+    document.getElementById('equipa-b').value = a.equipaB;
+    document.getElementById('valor-aposta').value = a.valor;
+    document.getElementById('odd-aposta').value = a.odd;
+    document.getElementById('data-aposta').value = a.data;
+    document.getElementById('edit-index').value = index;
+    
+    document.getElementById('form-title').innerHTML = '<i class="fa-solid fa-pen"></i> Editar Aposta';
+    document.getElementById('btn-salvar').innerText = 'Atualizar Aposta';
+    mudarAba('registo');
+}
+
+function apagarAposta(index) {
+    if (confirm('Tem a certeza que pretende apagar esta aposta?')) {
+        dadosApp.apostas.splice(index, 1);
+        guardarDadosLocais();
+        renderizarTudo();
     }
 }
 
-function mudarAba(aba) {
-    document.getElementById('secao-registo').classList.add('hidden');
-    document.getElementById('secao-historico').classList.add('hidden');
-    document.getElementById('secao-extrato').classList.add('hidden');
-    document.getElementById('secao-graficos').classList.add('hidden');
-
-    document.getElementById('secao-registo').classList.remove('flex');
-    document.getElementById('secao-historico').classList.remove('flex');
-    document.getElementById('secao-extrato').classList.remove('flex');
-    document.getElementById('secao-graficos').classList.remove('flex');
-
-    document.getElementById('tab-registo').className = "px-1 py-1 font-semibold text-slate-400 hover:text-slate-200 transition truncate";
-    document.getElementById('tab-historico').className = "px-1 py-1 font-semibold text-slate-400 hover:text-slate-200 transition truncate";
-    document.getElementById('tab-extrato').className = "px-1 py-1 font-semibold text-slate-400 hover:text-slate-200 transition truncate";
-    document.getElementById('tab-graficos').className = "px-1 py-1 font-semibold text-slate-400 hover:text-slate-200 transition truncate";
-
-    document.getElementById('nav-btn-registo').className = "flex flex-col items-center hover:text-slate-200 text-slate-400";
-    document.getElementById('nav-btn-historico').className = "flex flex-col items-center hover:text-slate-200 text-slate-400";
-    document.getElementById('nav-btn-extrato').className = "flex flex-col items-center hover:text-slate-200 text-slate-400";
-    document.getElementById('nav-btn-graficos').className = "flex flex-col items-center hover:text-slate-200 text-slate-400";
-
-    if (aba === 'registo') {
-        let el = document.getElementById('secao-registo');
-        el.classList.remove('hidden');
-        el.classList.add('flex');
-        document.getElementById('tab-registo').className = "px-1 py-1 font-semibold text-emerald-400 border-b-2 border-emerald-400 transition truncate";
-        document.getElementById('nav-btn-registo').className = "flex flex-col items-center text-emerald-400";
-    } else if (aba === 'historico') {
-        let el = document.getElementById('secao-historico');
-        el.classList.remove('hidden');
-        el.classList.add('flex');
-        document.getElementById('tab-historico').className = "px-1 py-1 font-semibold text-emerald-400 border-b-2 border-emerald-400 transition truncate";
-        document.getElementById('nav-btn-historico').className = "flex flex-col items-center text-emerald-400";
-        atualizarListaHistoricoCompleto();
-    } else if (aba === 'extrato') {
-        let el = document.getElementById('secao-extrato');
-        el.classList.remove('hidden');
-        el.classList.add('flex');
-        document.getElementById('tab-extrato').className = "px-1 py-1 font-semibold text-emerald-400 border-b-2 border-emerald-400 transition truncate";
-        document.getElementById('nav-btn-extrato').className = "flex flex-col items-center text-emerald-400";
-        preencherAnosFiltro();
-        atualizarExtrato();
-    } else if (aba === 'graficos') {
-        let el = document.getElementById('secao-graficos');
-        el.classList.remove('hidden');
-        el.classList.add('flex');
-        document.getElementById('tab-graficos').className = "px-1 py-1 font-semibold text-emerald-400 border-b-2 border-emerald-400 transition truncate";
-        document.getElementById('nav-btn-graficos').className = "flex flex-col items-center text-emerald-400";
-        atualizarGraficoLinhas();
+// -----------------------------------------
+// GESTÃO DE RASPADINHAS
+// -----------------------------------------
+function toggleValorPremio() {
+    const estado = document.getElementById('raspadinha-estado').value;
+    const container = document.getElementById('container-premio');
+    if (estado === 'Premiado') {
+        container.classList.remove('hidden');
+    } else {
+        container.classList.add('hidden');
     }
+}
+
+function guardarRaspadinha() {
+    const nome = document.getElementById('raspadinha-nome').value.trim();
+    const custo = parseFloat(document.getElementById('raspadinha-custo').value);
+    const estado = document.getElementById('raspadinha-estado').value;
+    const premio = estado === 'Premiado' ? (parseFloat(document.getElementById('raspadinha-premio').value) || 0) : 0;
+    const data = document.getElementById('raspadinha-data').value || new Date().toISOString().split('T')[0];
+
+    if (!nome || isNaN(custo) || custo <= 0) {
+        alert('Por favor, insira o nome e um custo válido para a raspadinha.');
+        return;
+    }
+
+    dadosApp.raspadinhas.push({
+        tipo: 'raspadinha',
+        nome,
+        custo,
+        estado,
+        premio,
+        data
+    });
+
+    guardarDadosLocais();
+    document.getElementById('raspadinha-nome').value = '';
+    document.getElementById('raspadinha-custo').value = '';
+    document.getElementById('raspadinha-premio').value = '';
+    document.getElementById('raspadinha-estado').value = 'Perdido';
+    toggleValorPremio();
+    preencherDataAtual();
+    renderizarTudo();
+    alert('Raspadinha registada com sucesso!');
+}
+
+function apagarRaspadinha(index) {
+    if (confirm('Pretende apagar o registo desta raspadinha?')) {
+        dadosApp.raspadinhas.splice(index, 1);
+        guardarDadosLocais();
+        renderizarTudo();
+    }
+}
+
+// -----------------------------------------
+// RENDERIZAÇÃO E CÁLCULOS GLOBAIS
+// -----------------------------------------
+function renderizarTudo() {
+    calcularBancaTotal();
+    renderizarRecentes();
+    renderizarRaspadinhasRecentes();
+    renderizarHistoricoCompleto();
+    povoarAnosFiltro();
+    atualizarExtrato();
+    atualizarGraficoLinhas();
 }
 
 function calcularBancaTotal() {
-    let bancaCalculada = bancaInicial;
-    apostas.forEach(aposta => {
-        if (aposta.estado === "Venceu") {
-            bancaCalculada += (aposta.valor * aposta.odd) - aposta.valor;
-        } else if (aposta.estado === "Perdeu") {
-            bancaCalculada -= aposta.valor;
+    let banca = dadosApp.saldoInicial;
+
+    // Processar apostas
+    dadosApp.apostas.forEach(a => {
+        if (a.estado === 'Venceu') {
+            banca += (a.valor * a.odd) - a.valor; // Lucro líquido
+        } else if (a.estado === 'Perdeu') {
+            banca -= a.valor;
         }
     });
-    return bancaCalculada;
+
+    // Processar raspadinhas
+    dadosApp.raspadinhas.forEach(r => {
+        banca -= r.custo;
+        if (r.estado === 'Premiado') {
+            banca += r.premio;
+        }
+    });
+
+    // Processar movimentos de caixa
+    dadosApp.movimentosCaixa.forEach(m => {
+        if (m.subtipo === 'deposito') banca += m.valor;
+        if (m.subtipo === 'levantamento') banca -= m.valor;
+    });
+
+    const elBanca = document.getElementById('banca-atual');
+    if (elBanca) {
+        elBanca.innerText = `${banca.toFixed(2)} €`;
+    }
 }
 
-function gerarHtmlApostaCard(aposta, originalIndex) {
-    let badgeClass = "bg-amber-500/20 text-amber-400 border-amber-500/30";
-    let valorGanhoPerdidoStr = "---";
+function renderizarRecentes() {
+    const container = document.getElementById('lista-recentes');
+    const contador = document.getElementById('contador-recentes');
+    if (!container) return;
 
-    if (aposta.estado === "Venceu") {
-        badgeClass = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
-        let lucro = (aposta.valor * aposta.odd) - aposta.valor;
-        valorGanhoPerdidoStr = `<span class="text-emerald-400 font-bold">+${lucro.toFixed(2)} €</span>`;
-    } else if (aposta.estado === "Perdeu") {
-        badgeClass = "bg-rose-500/20 text-rose-400 border-rose-500/30";
-        valorGanhoPerdidoStr = `<span class="text-rose-400 font-bold">-${aposta.valor.toFixed(2)} €</span>`;
+    container.innerHTML = '';
+    const hoje = new Date();
+    const seteDiasAtras = new Date();
+    seteDiasAtras.setDate(hoje.getDate() - 7);
+
+    const recentes = dadosApp.apostas.map((a, index) => ({ ...a, originalIndex: index }))
+        .filter(a => new Date(a.data) >= seteDiasAtras)
+        .sort((a, b) => new Date(b.data) - new Date(a.data));
+
+    if (contador) contador.innerText = `${recentes.length} registos`;
+
+    if (recentes.length === 0) {
+        container.innerHTML = '<div class="text-center py-4 text-slate-500 text-xs italic">Sem apostas recentes nos últimos 7 dias.</div>';
+        return;
     }
 
-    return `
-        <div class="bg-slate-800 border border-slate-700/60 p-2.5 rounded-xl flex justify-between items-center shrink-0">
+    recentes.forEach(a => {
+        let corEstado = 'bg-amber-500/20 text-amber-300';
+        let textoRes = 'Pendente';
+        if (a.estado === 'Venceu') {
+            corEstado = 'bg-emerald-500/20 text-emerald-300';
+            textoRes = `+${(a.valor * a.odd - a.valor).toFixed(2)} €`;
+        } else if (a.estado === 'Perdeu') {
+            corEstado = 'bg-rose-500/20 text-rose-300';
+            textoRes = `-${a.valor.toFixed(2)} €`;
+        }
+
+        const card = document.createElement('div');
+        card.className = 'bg-slate-900 border border-slate-700/60 p-2.5 rounded-xl flex justify-between items-center text-xs';
+        card.innerHTML = `
             <div>
-                <div class="flex items-center gap-1.5">
-                    <span class="text-[9px] bg-slate-700 px-1 py-0.5 rounded text-slate-300 font-medium">${aposta.modalidade}</span>
-                    <span class="text-xs font-bold text-white">${aposta.equipaA} vs ${aposta.equipaB}</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded-full border ${badgeClass}">${aposta.estado}</span>
+                <div class="flex items-center gap-1.5 mb-0.5">
+                    <span class="text-[9px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">${a.modalidade}</span>
+                    <span class="font-semibold text-white">${a.equipaA} vs ${a.equipaB}</span>
                 </div>
-                <div class="text-[10px] text-slate-400 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-                    <span>Data: ${aposta.data}</span>
-                    <span>Aposta: <b>${aposta.valor.toFixed(2)} €</b></span>
-                    <span>ODD: <b>${aposta.odd.toFixed(2)}</b></span>
-                    <span>Resultado: <b>${valorGanhoPerdidoStr}</b></span>
-                </div>
+                <p class="text-[10px] text-slate-400">Data: ${a.data} | Aposta: ${a.valor.toFixed(2)} € | ODD: ${a.odd}</p>
             </div>
-            <div class="flex gap-1">
-                <button onclick="editarAposta(${originalIndex})" class="bg-slate-700 hover:bg-slate-600 text-slate-200 p-1.5 rounded-lg text-xs" title="Editar"><i class="fa-solid fa-pen"></i></button>
-                <button onclick="apagarAposta(${originalIndex})" class="bg-rose-500/20 hover:bg-rose-500/40 text-rose-400 p-1.5 rounded-lg text-xs" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+            <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${corEstado}">${textoRes}</span>
+                <button onclick="editarAposta(${a.originalIndex})" class="text-slate-400 hover:text-emerald-400 p-1"><i class="fa-solid fa-pen"></i></button>
+                <button onclick="apagarAposta(${a.originalIndex})" class="text-slate-400 hover:text-rose-400 p-1"><i class="fa-solid fa-trash"></i></button>
             </div>
-        </div>
-    `;
+        `;
+        container.appendChild(card);
+    });
 }
 
-function atualizarInterface() {
-    let bancaCalculada = calcularBancaTotal();
-    let apostasComIndex = apostas.map((a, idx) => ({ ...a, originalIndex: idx }));
-    apostasComIndex.sort((a, b) => new Date(b.data) - new Date(a.data));
+function renderizarRaspadinhasRecentes() {
+    const container = document.getElementById('lista-raspadinhas');
+    const contador = document.getElementById('contador-raspadinhas');
+    if (!container) return;
 
-    let hoje = new Date();
-    let limiteDias = new Date();
-    limiteDias.setDate(hoje.getDate() - 7);
-    let apostasRecentes = apostasComIndex.filter(a => new Date(a.data) >= limiteDias);
+    container.innerHTML = '';
+    const lista = dadosApp.raspadinhas.map((r, index) => ({ ...r, originalIndex: index }))
+        .sort((a, b) => new Date(b.data) - new Date(a.data));
 
-    let htmlRecentes = "";
-    if (apostasRecentes.length === 0) {
-        htmlRecentes = `<div class="text-center py-4 text-slate-500 text-xs italic">Ainda não existem apostas nos últimos 7 dias.</div>`;
-    } else {
-        apostasRecentes.forEach(item => {
-            htmlRecentes += gerarHtmlApostaCard(item, item.originalIndex);
-        });
+    if (contador) contador.innerText = `${lista.length} registos`;
+
+    if (lista.length === 0) {
+        container.innerHTML = '<div class="text-center py-4 text-slate-500 text-xs italic">Sem registos de raspadinhas.</div>';
+        return;
     }
 
-    document.getElementById("banca-atual").innerText = bancaCalculada.toFixed(2) + " €";
-    document.getElementById("lista-recentes").innerHTML = htmlRecentes;
-    document.getElementById("contador-recentes").innerText = apostasRecentes.length + (apostasRecentes.length === 1 ? " registo" : " registos");
+    lista.forEach(r => {
+        let corRes = r.estado === 'Premiado' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300';
+        let descRes = r.estado === 'Premiado' ? `Prémio: +${r.premio.toFixed(2)} €` : `Custo: -${r.custo.toFixed(2)} €`;
+
+        const card = document.createElement('div');
+        card.className = 'bg-slate-900 border border-slate-700/60 p-2.5 rounded-xl flex justify-between items-center text-xs';
+        card.innerHTML = `
+            <div>
+                <div class="flex items-center gap-1.5 mb-0.5">
+                    <span class="text-[9px] bg-slate-800 text-emerald-400 px-1.5 py-0.5 rounded">Raspadinha</span>
+                    <span class="font-semibold text-white">${r.nome}</span>
+                </div>
+                <p class="text-[10px] text-slate-400">Data: ${r.data} | Custo: ${r.custo.toFixed(2)} €</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${corRes}">${descRes}</span>
+                <button onclick="apagarRaspadinha(${r.originalIndex})" class="text-slate-400 hover:text-rose-400 p-1"><i class="fa-solid fa-trash"></i></button>
+            </div>
+        `;
+        container.appendChild(card);
+    });
 }
 
-function atualizarListaHistoricoCompleto() {
-    let apostasComIndex = apostas.map((a, idx) => ({ ...a, originalIndex: idx }));
-    apostasComIndex.sort((a, b) => new Date(b.data) - new Date(a.data));
+function renderizarHistoricoCompleto() {
+    const container = document.getElementById('lista-historico-completo');
+    const contador = document.getElementById('contador-historico');
+    if (!container) return;
 
-    let htmlHistorico = "";
-    if (apostasComIndex.length === 0) {
-        htmlHistorico = `<div class="text-center py-5 text-slate-500 text-xs italic">Ainda não existem apostas registadas.</div>`;
-    } else {
-        apostasComIndex.forEach(item => {
-            htmlHistorico += gerarHtmlApostaCard(item, item.originalIndex);
-        });
+    container.innerHTML = '';
+    
+    // Unificar apostas e raspadinhas para o histórico
+    let todos = [
+        ...dadosApp.apostas.map((a, i) => ({ ...a, originType: 'aposta', originIndex: i })),
+        ...dadosApp.raspadinhas.map((r, i) => ({ ...r, originType: 'raspadinha', originIndex: i }))
+    ].sort((a, b) => new Date(b.data) - new Date(a.data));
+
+    if (contador) contador.innerText = `${todos.length} registos`;
+
+    if (todos.length === 0) {
+        container.innerHTML = '<div class="text-center py-5 text-slate-500 text-xs italic">Histórico vazio.</div>';
+        return;
     }
 
-    document.getElementById("lista-historico-completo").innerHTML = htmlHistorico;
-    document.getElementById("contador-historico").innerText = apostasComIndex.length + (apostasComIndex.length === 1 ? " registo" : " registos");
-}
-
-function preencherAnosFiltro() {
-    let anos = new Set();
-    apostas.forEach(a => {
-        if (a.data) anos.add(a.data.split('-')[0]);
-    });
-    let selectAno = document.getElementById('filtro-ano');
-    let anoAtualSel = selectAno.value;
-    let html = '<option value="todos">Todos</option>';
-    anos.forEach(ano => {
-        html += `<option value="${ano}">${ano}</option>`;
-    });
-    selectAno.innerHTML = html;
-    selectAno.value = anos.has(anoAtualSel) ? anoAtualSel : 'todos';
-}
-
-function obterSemanaDoMes(dataStr) {
-    let dia = parseInt(dataStr.split('-')[2]);
-    if (dia <= 7) return 1;
-    if (dia <= 14) return 2;
-    if (dia <= 21) return 3;
-    return 4;
-}
-
-function obterDadosExtratoFiltrados() {
-    let filtroAno = document.getElementById('filtro-ano').value;
-    let filtroMes = document.getElementById('filtro-mes').value;
-    let filtroSemana = document.getElementById('filtro-semana').value;
-
-    let saldoAcumuladoGlobal = bancaInicial;
-    let saldoAnualCalc = 0;
-    let saldoMensalCalc = 0;
-    let saldoSemanalCalc = 0;
-
-    let movimentosFiltrados = [];
-    let apostasOrdenadas = [...apostas].sort((a, b) => new Date(a.data) - new Date(b.data));
-
-    apostasOrdenadas.forEach((aposta) => {
-        if (aposta.estado === "Pendente") return;
-
-        let [ano, mes, dia] = aposta.data.split('-');
-        let semana = obterSemanaDoMes(aposta.data);
-
-        let impacto = 0;
-        let creditoNum = 0;
-        let debitoNum = 0;
-
-        if (aposta.estado === "Venceu") {
-            let lucro = (aposta.valor * aposta.odd) - aposta.valor;
-            impacto = lucro;
-            creditoNum = lucro;
-        } else if (aposta.estado === "Perdeu") {
-            impacto = -aposta.valor;
-            debitoNum = aposta.valor;
+    todos.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'bg-slate-900 border border-slate-700/60 p-2.5 rounded-xl flex justify-between items-center text-xs';
+        
+        if (item.originType === 'aposta') {
+            card.innerHTML = `
+                <div>
+                    <div class="flex items-center gap-1.5 mb-0.5">
+                        <span class="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded">Aposta (${item.modalidade})</span>
+                        <span class="font-semibold text-white">${item.equipaA} vs ${item.equipaB}</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400">${item.data} | Valor: ${item.valor.toFixed(2)} € | ODD: ${item.odd} | Estado: <span class="text-slate-200">${item.estado}</span></p>
+                </div>
+                <button onclick="apagarAposta(${item.originIndex})" class="text-slate-400 hover:text-rose-400 p-1"><i class="fa-solid fa-trash"></i></button>
+            `;
+        } else {
+            card.innerHTML = `
+                <div>
+                    <div class="flex items-center gap-1.5 mb-0.5">
+                        <span class="text-[9px] bg-teal-500/20 text-teal-300 px-1.5 py-0.5 rounded">Raspadinha</span>
+                        <span class="font-semibold text-white">${item.nome}</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400">${item.data} | Custo: ${item.custo.toFixed(2)} € | Estado: <span class="text-slate-200">${item.estado}</span> ${item.estado === 'Premiado' ? `(Prémio: ${item.premio.toFixed(2)}€)` : ''}</p>
+                </div>
+                <button onclick="apagarRaspadinha(${item.originIndex})" class="text-slate-400 hover:text-rose-400 p-1"><i class="fa-solid fa-trash"></i></button>
+            `;
         }
-
-        saldoAcumuladoGlobal += impacto;
-
-        let matchAno = (filtroAno === 'todos' || ano === filtroAno);
-        let matchMes = matchAno && (filtroMes === 'todos' || parseInt(mes) === parseInt(filtroMes));
-        let matchSemana = matchMes && (filtroSemana === 'todas' || semana === parseInt(filtroSemana));
-
-        if (matchAno) saldoAnualCalc += impacto;
-        if (matchMes) saldoMensalCalc += impacto;
-        if (matchSemana) saldoSemanalCalc += impacto;
-
-        if (matchAno && matchMes && matchSemana) {
-            movimentosFiltrados.push({
-                data: aposta.data,
-                descricao: `${aposta.modalidade}: ${aposta.equipaA} vs ${aposta.equipaB}`,
-                debito: debitoNum,
-                credito: creditoNum,
-                acumulado: saldoAcumuladoGlobal
-            });
-        }
+        container.appendChild(card);
     });
+}
 
-    return {
-        movimentos: movimentosFiltrados,
-        saldoAnual: saldoAnualCalc,
-        saldoMensal: saldoMensalCalc,
-        saldoSemanal: saldoSemanalCalc
-    };
+// -----------------------------------------
+// EXTRATO E FILTROS TEMPORAIS
+// -----------------------------------------
+function povoarAnosFiltro() {
+    const selectAno = document.getElementById('filtro-ano');
+    if (!selectAno) return;
+    
+    let anosSet = new Set();
+    dadosApp.apostas.forEach(a => { if (a.data) anosSet.add(a.data.split('-')[0]); });
+    dadosApp.raspadinhas.forEach(r => { if (r.data) anosSet.add(r.data.split('-')[0]); });
+    dadosApp.movimentosCaixa.forEach(m => { if (m.data) anosSet.add(m.data.split('-')[0]); });
+
+    const anoAtual = new Date().getFullYear().toString();
+    anosSet.add(anoAtual);
+
+    const valorSelecionado = selectAno.value;
+    selectAno.innerHTML = '<option value="todos">Todos</option>';
+    Array.from(anosSet).sort().reverse().forEach(ano => {
+        const opt = document.createElement('option');
+        opt.value = ano;
+        opt.innerText = ano;
+        selectAno.appendChild(opt);
+    });
+    selectAno.value = anosSet.has(valorSelecionado) ? valorSelecionado : 'todos';
 }
 
 function atualizarExtrato() {
-    let dados = obterDadosExtratoFiltrados();
-    let htmlExtrato = `
-        <tr class="border-b border-slate-800 bg-slate-900/40">
-            <td class="py-1 px-1 text-slate-300 font-medium">Banca Inicial Configurada</td>
-            <td class="py-1 px-1 text-slate-500">-</td>
-            <td class="py-1 px-1 text-emerald-400">+${bancaInicial.toFixed(2)} €</td>
-            <td class="py-1 px-1 text-right font-bold text-white">${bancaInicial.toFixed(2)} €</td>
-        </tr>
-    `;
+    const tbody = document.getElementById('tabela-extrato');
+    const contadorExtrato = document.getElementById('extrato-contador');
+    if (!tbody) return;
 
-    dados.movimentos.forEach((m) => {
-        let creditoStr = m.credito > 0 ? `+${m.credito.toFixed(2)} €` : "-";
-        let debitoStr = m.debito > 0 ? `-${m.debito.toFixed(2)} €` : "-";
-        let corTextoAcumulado = m.acumulado >= bancaInicial ? 'text-emerald-400' : 'text-rose-400';
+    const filtroAno = document.getElementById('filtro-ano').value;
+    const filtroMes = document.getElementById('filtro-mes').value;
+    const filtroSemana = document.getElementById('filtro-semana').value;
 
-        htmlExtrato += `
-            <tr class="border-b border-slate-800">
-                <td class="py-1 px-1"><b>${m.data}</b><br><span class="text-[8px] text-slate-400">${m.descricao}</span></td>
-                <td class="py-1 px-1 text-rose-400">${debitoStr}</td>
-                <td class="py-1 px-1 text-emerald-400">${creditoStr}</td>
-                <td class="py-1 px-1 text-right font-bold ${corTextoAcumulado}">${m.acumulado.toFixed(2)} €</td>
-            </tr>
-        `;
+    // Compilar todas as transações cronologicamente
+    let transacoes = [];
+
+    dadosApp.apostas.forEach(a => {
+        if (a.estado === 'Perdido') {
+            transacoes.push({ data: a.data, desc: `Aposta Perdida: ${a.equipaA} vs ${a.equipaB}`, debito: a.valor, credito: 0 });
+        } else if (a.estado === 'Venceu') {
+            transacoes.push({ data: a.data, desc: `Aposta Vencida: ${a.equipaA} vs ${a.equipaB}`, debito: 0, credito: (a.valor * a.odd) - a.valor });
+        }
     });
 
-    document.getElementById("tabela-extrato").innerHTML = htmlExtrato;
-    document.getElementById("extrato-contador").innerText = dados.movimentos.length + (dados.movimentos.length === 1 ? " movimento" : " movimentos");
+    dadosApp.raspadinhas.forEach(r => {
+        transacoes.push({ data: r.data, desc: `Raspadinha: ${r.nome} (Custo)`, debito: r.custo, credito: 0 });
+        if (r.estado === 'Premiado' && r.premio > 0) {
+            transacoes.push({ data: r.data, desc: `Prémio Raspadinha: ${r.nome}`, debito: 0, credito: r.premio });
+        }
+    });
 
-    document.getElementById("saldo-anual").innerText = (dados.saldoAnual >= 0 ? "+" : "") + dados.saldoAnual.toFixed(2) + " €";
-    document.getElementById("saldo-anual").className = `text-xs font-bold mt-0.5 ${dados.saldoAnual >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+    dadosApp.movimentosCaixa.forEach(m => {
+        if (m.subtipo === 'deposito') {
+            transacoes.push({ data: m.data, desc: `Depósito de Capital`, debito: 0, credito: m.valor });
+        } else if (m.subtipo === 'levantamento') {
+            transacoes.push({ data: m.data, desc: `Levantamento de Capital`, debito: m.valor, credito: 0 });
+        }
+    });
 
-    document.getElementById("saldo-mensal").innerText = (dados.saldoMensal >= 0 ? "+" : "") + dados.saldoMensal.toFixed(2) + " €";
-    document.getElementById("saldo-mensal").className = `text-xs font-bold mt-0.5 ${dados.saldoMensal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+    transacoes.sort((a, b) => new Date(a.data) - new Date(b.data));
 
-    document.getElementById("saldo-semanal").innerText = (dados.saldoSemanal >= 0 ? "+" : "") + dados.saldoSemanal.toFixed(2) + " €";
-    document.getElementById("saldo-semanal").className = `text-xs font-bold mt-0.5 ${dados.saldoSemanal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+    // Filtrar por ano, mês e semana
+    let filtradas = transacoes.filter(t => {
+        if (!t.data) return false;
+        const [ano, mes, dia] = t.data.split('-');
+        if (filtroAno !== 'todos' && ano !== filtroAno) return false;
+        if (filtroMes !== 'todos' && parseInt(mes) !== parseInt(filtroMes)) return false;
+        if (filtroSemana !== 'todas') {
+            const dNum = parseInt(dia);
+            const sem = dNum <= 7 ? 1 : dNum <= 14 ? 2 : dNum <= 21 ? 3 : 4;
+            if (sem !== parseInt(filtroSemana)) return false;
+        }
+        return true;
+    });
+
+    tbody.innerHTML = '';
+    let acumulado = dadosApp.saldoInicial;
+    
+    // Calcular saldo inicial acumulado até ao filtro, se necessário, ou correr sequencialmente
+    let movimentosTotais = 0;
+    filtradas.forEach(t => {
+        movimentosTotais++;
+        acumulado += (t.credito - t.debito);
+
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-slate-700/50 hover:bg-slate-700/30';
+        tr.innerHTML = `
+            <td class="py-2 px-1">
+                <div class="font-medium text-white">${t.desc}</div>
+                <div class="text-[9px] text-slate-400">${t.data}</div>
+            </td>
+            <td class="py-2 px-1 text-rose-400 font-semibold">${t.debito > 0 ? `-${t.debito.toFixed(2)} €` : '-'}</td>
+            <td class="py-2 px-1 text-emerald-400 font-semibold">${t.credito > 0 ? `+${t.credito.toFixed(2)} €` : '-'}</td>
+            <td class="py-2 px-1 text-right font-bold text-slate-200">${acumulado.toFixed(2)} €</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    if (contadorExtrato) contadorExtrato.innerText = `${movimentosTotais} movimentos`;
+
+    // Atualizar caixas de saldos resumidos (anual, mensal, semanal)
+    atualizarSaldosTemporais(transacoes);
+}
+
+function atualizarSaldosTemporais(transacoes) {
+    const hoje = new Date();
+    const anoAtual = hoje.getFullYear().toString();
+    const mesAtual = hoje.getMonth() + 1;
+
+    let saldoAnual = 0;
+    let saldoMensal = 0;
+    let saldoSemanal = 0;
+
+    const seteDiasAtras = new Date();
+    seteDiasAtras.setDate(hoje.getDate() - 7);
+
+    transacoes.forEach(t => {
+        if (!t.data) return;
+        const [ano, mes, dia] = t.data.split('-');
+        const tDate = new Date(t.data);
+        const diff = t.credito - t.debito;
+
+        if (ano === anoAtual) {
+            saldoAnual += diff;
+            if (parseInt(mes) === mesAtual) {
+                saldoMensal += diff;
+            }
+        }
+        if (tDate >= seteDiasAtras) {
+            saldoSemanal += diff;
+        }
+    });
+
+    const elAnual = document.getElementById('saldo-anual');
+    const elMensal = document.getElementById('saldo-mensal');
+    const elSemanal = document.getElementById('saldo-semanal');
+
+    if (elAnual) {
+        elAnual.innerText = `${saldoAnual >= 0 ? '+' : ''}${saldoAnual.toFixed(2)} €`;
+        elAnual.className = `text-xs font-bold mt-0.5 ${saldoAnual >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+    }
+    if (elMensal) {
+        elMensal.innerText = `${saldoMensal >= 0 ? '+' : ''}${saldoMensal.toFixed(2)} €`;
+        elMensal.className = `text-xs font-bold mt-0.5 ${saldoMensal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+    }
+    if (elSemanal) {
+        elSemanal.innerText = `${saldoSemanal >= 0 ? '+' : ''}${saldoSemanal.toFixed(2)} €`;
+        elSemanal.className = `text-xs font-bold mt-0.5 ${saldoSemanal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+    }
 }
 
 function gerarPdfExtrato() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-
-    let dados = obterDadosExtratoFiltrados();
-    let filtroAno = document.getElementById('filtro-ano').value;
-    let filtroMes = document.getElementById('filtro-mes').value;
-    let filtroSemana = document.getElementById('filtro-semana').value;
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.setTextColor(16, 185, 129);
-    doc.text("Apostas do Zé - Extrato de Conta", 14, 20);
-
-    doc.setFont("helvetica", "normal");
+    doc.text("Extrato - Apostas do Zé", 14, 20);
     doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Data de Emissão: ${new Date().toLocaleDateString('pt-PT')}`, 14, 26);
-    doc.text(`Filtros Aplicados -> Ano: ${filtroAno} | Mês: ${filtroMes} | Semana: ${filtroSemana}`, 14, 32);
+    doc.text(`Saldo Inicial Base: ${dadosApp.saldoInicial.toFixed(2)} EUR`, 14, 28);
+    
+    let y = 38;
+    doc.text("Data | Descrição | Débito | Crédito", 14, y);
+    doc.line(14, y + 2, 196, y + 2);
+    
+    let acumulado = dadosApp.saldoInicial;
+    let transacoes = [];
 
-    doc.setFillColor(241, 245, 249);
-    doc.roundedRect(14, 38, 182, 18, 2, 2, 'F');
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(30, 41, 59);
-    doc.text(`Saldo Anual: ${dados.saldoAnual >= 0 ? '+' : ''}${dados.saldoAnual.toFixed(2)} EUR`, 18, 49);
-    doc.text(`Saldo Mensal: ${dados.saldoMensal >= 0 ? '+' : ''}${dados.saldoMensal.toFixed(2)} EUR`, 78, 49);
-    doc.text(`Saldo Semanal: ${dados.saldoSemanal >= 0 ? '+' : ''}${dados.saldoSemanal.toFixed(2)} EUR`, 138, 49);
+    dadosApp.apostas.forEach(a => {
+        if (a.estado === 'Perdido') transacoes.push({ data: a.data, desc: `Aposta Perdida: ${a.equipaA} vs ${a.equipaB}`, debito: a.valor, credito: 0 });
+        if (a.estado === 'Venceu') transacoes.push({ data: a.data, desc: `Aposta Vencida: ${a.equipaA} vs ${a.equipaB}`, debito: 0, credito: (a.valor * a.odd) - a.valor });
+    });
+    dadosApp.raspadinhas.forEach(r => {
+        transacoes.push({ data: r.data, desc: `Raspadinha: ${r.nome}`, debito: r.custo, credito: 0 });
+        if (r.estado === 'Premiado') transacoes.push({ data: r.data, desc: `Prémio Raspadinha: ${r.nome}`, debito: 0, credito: r.premio });
+    });
+    transacoes.sort((a, b) => new Date(a.data) - new Date(b.data));
 
-    let y = 65;
-    doc.setFontSize(11);
-    doc.text("Movimentos Detalhados", 14, y);
-    y += 6;
-
-    doc.setFillColor(30, 41, 59);
-    doc.rect(14, y, 182, 8, 'F');
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(255, 255, 255);
-    doc.text("Data / Descrição", 18, y + 5.5);
-    doc.text("Débito", 110, y + 5.5);
-    doc.text("Crédito", 138, y + 5.5);
-    doc.text("Acumulado", 175, y + 5.5, { align: "right" });
-
-    y += 8;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-
-    doc.setTextColor(50, 50, 50);
-    doc.text("Banca Inicial Configurada", 18, y + 5);
-    doc.text("-", 110, y + 5);
-    doc.text(`+${bancaInicial.toFixed(2)} €`, 138, y + 5);
-    doc.text(`${bancaInicial.toFixed(2)} €`, 190, y + 5, { align: "right" });
-    y += 8;
-
-    dados.movimentos.forEach((m, idx) => {
-        if (y > 275) {
-            doc.addPage();
-            y = 20;
-        }
-
-        if (idx % 2 === 0) {
-            doc.setFillColor(248, 250, 252);
-            doc.rect(14, y - 2, 182, 8, 'F');
-        }
-
-        doc.setTextColor(30, 30, 30);
-        doc.text(`${m.data} - ${m.descricao}`, 18, y + 3);
-        
-        let debitoStr = m.debito > 0 ? `-${m.debito.toFixed(2)} €` : "-";
-        let creditoStr = m.credito > 0 ? `+${m.credito.toFixed(2)} €` : "-";
-
-        doc.text(debitoStr, 110, y + 3);
-        doc.text(creditoStr, 138, y + 3);
-        doc.text(`${m.acumulado.toFixed(2)} €`, 190, y + 3, { align: "right" });
-
+    transacoes.forEach(t => {
         y += 8;
+        if (y > 280) { doc.addPage(); y = 20; }
+        acumulado += (t.credito - t.debito);
+        doc.text(`${t.data} | ${t.desc} | -${t.debito.toFixed(2)} | +${t.credito.toFixed(2)}`, 14, y);
     });
 
-    doc.save(`extrato_apostas_${filtroAno}_${filtroMes}.pdf`);
+    doc.save("extrato-apostas-do-ze.pdf");
 }
 
+// -----------------------------------------
+// GRÁFICOS DE LINHAS DA BANCA
+// -----------------------------------------
 function atualizarGraficoLinhas() {
-    let container = document.getElementById("grafico-linhas-svg-container");
-    let labelsContainer = document.getElementById("grafico-eixo-x-labels");
+    const container = document.getElementById('grafico-linhas-svg-container');
+    const eixoX = document.getElementById('grafico-eixo-x-labels');
+    if (!container || !eixoX) return;
 
-    let dataInicioStr = document.getElementById('grafico-data-inicio').value;
-    let dataFimStr = document.getElementById('grafico-data-fim').value;
+    container.innerHTML = '';
+    eixoX.innerHTML = '';
 
-    if (!dataInicioStr || !dataFimStr) {
-        container.innerHTML = `<div class="w-full text-center text-slate-500 text-xs italic my-auto">Selecione o intervalo de datas.</div>`;
+    // Agrupar transações por dia e calcular saldo acumulado temporal
+    let transacoes = [];
+    dadosApp.apostas.forEach(a => {
+        if (a.estado === 'Perdido') transacoes.push({ data: a.data, val: -a.valor });
+        if (a.estado === 'Venceu') transacoes.push({ data: a.data, val: (a.valor * a.odd) - a.valor });
+    });
+    dadosApp.raspadinhas.forEach(r => {
+        transacoes.push({ data: r.data, val: -r.custo });
+        if (r.estado === 'Premiado') transacoes.push({ data: r.data, val: r.premio });
+    });
+    dadosApp.movimentosCaixa.forEach(m => {
+        transacoes.push({ data: m.data, val: m.subtipo === 'deposito' ? m.valor : -m.valor });
+    });
+
+    transacoes.sort((a, b) => new Date(a.data) - new Date(b.data));
+
+    let pontosPorDia = {};
+    let runningBanca = dadosApp.saldoInicial;
+    
+    // Adicionar ponto inicial base se necessário
+    pontosPorDia[transacoes.length > 0 ? transacoes[0].data : new Date().toISOString().split('T')[0]] = runningBanca;
+
+    transacoes.forEach(t => {
+        runningBanca += t.val;
+        pontosPorDia[t.data] = runningBanca;
+    });
+
+    const datas = Object.keys(pontosPorDia);
+    if (datas.length === 0) {
+        container.innerHTML = '<div class="w-full text-center text-slate-500 text-[10px] pb-4">Sem dados suficientes para gerar gráfico.</div>';
         return;
     }
 
-    let dInicio = new Date(dataInicioStr);
-    let dFim = new Date(dataFimStr);
+    const valores = Object.values(pontosPorDia);
+    const minVal = Math.min(...valores, dadosApp.saldoInicial) * 0.95;
+    const maxVal = Math.max(...valores, dadosApp.saldoInicial) * 1.05;
+    const amplitude = maxVal - minVal || 1;
 
-    if (dInicio > dFim) {
-        container.innerHTML = `<div class="w-full text-center text-rose-400 text-xs italic my-auto">A data de início deve ser anterior à data de fim.</div>`;
-        return;
-    }
+    // Criar elementos SVG dinâmicos
+    let svgHTML = `<svg class="w-full h-full overflow-visible" viewBox="0 0 300 120" preserveAspectRatio="none">`;
+    
+    // Linha de referência do Saldo Inicial
+    const ySaldoInicial = 120 - ((dadosApp.saldoInicial - minVal) / amplitude) * 110;
+    svgHTML += `<line x1="0" y1="${ySaldoInicial}" x2="300" y2="${ySaldoInicial}" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.8"/>`;
 
-    let saldoCorrente = bancaInicial;
-    let apostasOrdenadas = [...apostas].sort((a, b) => new Date(a.data) - new Date(b.data));
+    let coords = [];
+    datas.forEach((d, i) => {
+        const x = (i / (datas.length - 1 || 1)) * 280 + 10;
+        const val = pontosPorDia[d];
+        const y = 120 - ((val - minVal) / amplitude) * 110;
+        coords.push({ x, y, val, data: d });
+    });
 
-    apostasOrdenadas.forEach(a => {
-        if (a.data < dataInicioStr) {
-            if (a.estado === "Venceu") saldoCorrente += (a.valor * a.odd) - a.valor;
-            else if (a.estado === "Perdeu") saldoCorrente -= a.valor;
+    if (coords.length > 1) {
+        let pathD = `M ${coords[0].x} ${coords[0].y}`;
+        for (let i = 1; i < coords.length; i++) {
+            pathD += ` L ${coords[i].x} ${coords[i].y}`;
         }
+        svgHTML += `<path d="${pathD}" fill="none" stroke="#34d399" stroke-width="2.5" />`;
+    }
+
+    coords.forEach(c => {
+        svgHTML += `<circle cx="${c.x}" cy="${c.y}" r="3" fill="#10b981" stroke="#0f172a" stroke-width="1.5"/>`;
     });
 
-    let pontosGrafico = [];
-    let minBanca = bancaInicial;
-    let maxBanca = bancaInicial;
+    svgHTML += `</svg>`;
+    container.innerHTML = svgHTML;
 
-    let impactoPorData = {};
-    apostasOrdenadas.forEach(a => {
-        if (a.data >= dataInicioStr && a.data <= dataFimStr) {
-            let impacto = 0;
-            if (a.estado === "Venceu") impacto = (a.valor * a.odd) - a.valor;
-            else if (a.estado === "Perdeu") impacto = -a.valor;
-
-            if (!impactoPorData[a.data]) impactoPorData[a.data] = 0;
-            impactoPorData[a.data] += impacto;
-        }
-    });
-
-    let datasComAposta = Object.keys(impactoPorData).sort();
-
-    if (datasComAposta.length === 0) {
-        container.innerHTML = `<div class="w-full text-center text-slate-500 text-xs italic my-auto">Sem apostas registadas neste intervalo.</div>`;
-        labelsContainer.innerHTML = `<span>${dataInicioStr}</span><span>${dataFimStr}</span>`;
-        return;
-    }
-
-    datasComAposta.forEach(dataStr => {
-        saldoCorrente += impactoPorData[dataStr];
-        pontosGrafico.push({ data: dataStr, saldo: saldoCorrente });
-        if (saldoCorrente < minBanca) minBanca = saldoCorrente;
-        if (saldoCorrente > maxBanca) maxBanca = saldoCorrente;
-    });
-
-    minBanca = Math.floor(minBanca / 5) * 5;
-    maxBanca = Math.ceil(maxBanca / 5) * 5;
-    if (minBanca === maxBanca) maxBanca += 5;
-
-    let spanBanca = maxBanca - minBanca;
-    let svgWidth = 360;
-    let svgHeight = 110;
-    let pontosSvg = "";
-    let passosX = pontosGrafico.length > 1 ? svgWidth / (pontosGrafico.length - 1) : svgWidth / 2;
-
-    pontosGrafico.forEach((item, index) => {
-        let x = pontosGrafico.length === 1 ? svgWidth / 2 : index * passosX;
-        let y = svgHeight - ((item.saldo - minBanca) / spanBanca) * (svgHeight - 16) - 8;
-        pontosSvg += `${x},${y} `;
-    });
-
-    let yPosBancaInicial = svgHeight - ((bancaInicial - minBanca) / spanBanca) * (svgHeight - 16) - 8;
-
-    let linhasGrelhaSvg = `
-        <line x1="0" y1="${yPosBancaInicial}" x2="${svgWidth}" y2="${yPosBancaInicial}" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="4,4" />
-    `;
-
-    for (let val = minBanca; val <= maxBanca; val += 5) {
-        if (val === bancaInicial) continue;
-        let yPos = svgHeight - ((val - minBanca) / spanBanca) * (svgHeight - 16) - 8;
-        linhasGrelhaSvg += `<line x1="0" y1="${yPos}" x2="${svgWidth}" y2="${yPos}" stroke="#334155" stroke-width="0.5" />`;
-    }
-
-    let diasSemanaNomes = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-    let htmlLabels = "";
-    if (pontosGrafico.length > 0) {
-        let primeiroDiaObj = new Date(pontosGrafico[0].data);
-        let ultimoDiaObj = new Date(pontosGrafico[pontosGrafico.length - 1].data);
-        let dSemanaInicio = diasSemanaNomes[primeiroDiaObj.getDay()];
-        let dSemanaFim = diasSemanaNomes[ultimoDiaObj.getDay()];
-        htmlLabels = `<span>${pontosGrafico[0].data.substring(5)} (${dSemanaInicio})</span><span>${pontosGrafico[pontosGrafico.length - 1].data.substring(5)} (${dSemanaFim})</span>`;
-    }
-
-    container.innerHTML = `
-        <svg viewBox="0 0 ${svgWidth} ${svgHeight}" class="w-full h-full overflow-visible">
-            ${linhasGrelhaSvg}
-            <polyline fill="none" stroke="#10b981" stroke-width="2.5" points="${pontosSvg}" stroke-linecap="round" stroke-linejoin="round" />
-            ${pontosGrafico.map((item, index) => {
-                let x = pontosGrafico.length === 1 ? svgWidth / 2 : index * passosX;
-                let y = svgHeight - ((item.saldo - minBanca) / spanBanca) * (svgHeight - 16) - 8;
-                let corPonto = item.saldo < bancaInicial ? '#f43f5e' : '#34d399';
-                let dObj = new Date(item.data);
-                let dSemana = diasSemanaNomes[dObj.getDay()];
-                return `<circle cx="${x}" cy="${y}" r="3.5" fill="${corPonto}" class="cursor-pointer">
-                    <title>${item.data} (${dSemana}): ${item.saldo.toFixed(2)}€ (Inicial: ${bancaInicial.toFixed(2)}€)</title>
-                </circle>`;
-            }).join('')}
-        </svg>
-    `;
-    labelsContainer.innerHTML = htmlLabels;
-}
-
-async function guardarAposta() {
-    let modalidade = document.getElementById("modalidade-aposta").value;
-    let equipaA = document.getElementById("equipa-a").value.trim();
-    let equipaB = document.getElementById("equipa-b").value.trim();
-    let valor = parseFloat(document.getElementById("valor-aposta").value);
-    let odd = parseFloat(document.getElementById("odd-aposta").value);
-    let estado = document.getElementById("estado-aposta").value;
-    let data = document.getElementById("data-aposta").value;
-    let editIndex = parseInt(document.getElementById("edit-index").value);
-
-    if (!equipaA || !equipaB || isNaN(valor) || isNaN(odd) || !data) {
-        alert("Por favor, preencha todos os campos corretamente.");
-        return;
-    }
-
-    if (editIndex === -1) {
-        apostas.push({ modalidade, equipaA, equipaB, valor, odd, estado, data });
-    } else {
-        apostas[editIndex] = { modalidade, equipaA, equipaB, valor, odd, estado, data };
-        document.getElementById("edit-index").value = "-1";
-        document.getElementById("form-title").innerHTML = `<i class="fa-solid fa-plus-circle"></i> Registar Nova Aposta`;
-        document.getElementById("btn-salvar").innerText = "Concluir e Registar";
-    }
-
-    document.getElementById("equipa-a").value = "";
-    document.getElementById("equipa-b").value = "";
-    document.getElementById("valor-aposta").value = "";
-    document.getElementById("odd-aposta").value = "";
-    document.getElementById("estado-aposta").value = "Pendente";
-    document.getElementById("modalidade-aposta").value = "Futebol";
-
-    await guardarDadosNoDrive();
-    atualizarInterface();
-}
-
-function editarAposta(index) {
-    let a = apostas[index];
-    document.getElementById("modalidade-aposta").value = a.modalidade;
-    document.getElementById("equipa-a").value = a.equipaA;
-    document.getElementById("equipa-b").value = a.equipaB;
-    document.getElementById("valor-aposta").value = a.valor;
-    document.getElementById("odd-aposta").value = a.odd;
-    document.getElementById("estado-aposta").value = a.estado;
-    document.getElementById("data-aposta").value = a.data;
-    document.getElementById("edit-index").value = index;
-
-    document.getElementById("form-title").innerHTML = `<i class="fa-solid fa-pen-to-square"></i> A Editar Aposta #${index + 1}`;
-    document.getElementById("btn-salvar").innerText = "Atualizar Registo";
-    mudarAba('registo');
-}
-
-async function apagarAposta(index) {
-    if (confirm("Tem certeza que deseja apagar este registo?")) {
-        apostas.splice(index, 1);
-        await guardarDadosNoDrive();
-        atualizarInterface();
+    // Rótulos do eixo X
+    if (datas.length > 0) {
+        eixoX.innerHTML = `<span>${datas[0]}</span><span>${datas[datas.length - 1]}</span>`;
     }
 }
-
-function abrirConfigBanca() {
-    let novoValor = prompt("Introduza o valor inicial da Banca:", bancaInicial);
-    if (novoValor !== null && !isNaN(parseFloat(novoValor))) {
-        bancaInicial = parseFloat(novoValor);
-        atualizarInterface();
-    }
-}
-
-document.getElementById('secao-registo').classList.add('flex');
-carregarDadosDoDrive();
