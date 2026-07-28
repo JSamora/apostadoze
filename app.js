@@ -586,37 +586,33 @@ function atualizarExtrato() {
 
     transacoes.sort((a, b) => new Date(a.data) - new Date(b.data));
 
-    // Cálculo dos totais para os cartões de resumo superior (Anual/Global, Mensal, Semanal)
+    // Cálculo dos totais para os cartões de resumo superior
     let totalAnual = 0;
     let totalMensal = 0;
     let totalSemanal = 0;
-
-    const agora = new Date();
-    const anoAtualStr = agora.getFullYear().toString();
-    const mesAtualNum = agora.getMonth() + 1;
-    const diaAtualNum = agora.getDate();
-    const semanaAtualNum = diaAtualNum <= 7 ? 1 : diaAtualNum <= 14 ? 2 : diaAtualNum <= 21 ? 3 : 4;
 
     transacoes.forEach(t => {
         if (!t.data) return;
         const [tAno, tMes, tDia] = t.data.split('-');
         const tVal = t.credito - t.debito;
 
-        // Se o filtro for 'Todos', acumula o global histórico de todos os anos
+        // 1. Saldo Anual: Respeita o filtro de ano (se 'todos', acumula todo o histórico)
         if (filtroAno === 'todos' || tAno === filtroAno) {
             totalAnual += tVal;
         }
 
-        const anoAlvo = filtroAno !== 'todos' ? filtroAno : anoAtualStr;
-        const mesAlvo = filtroMes !== 'todos' ? parseInt(filtroMes) : mesAtualNum;
-        if (tAno === anoAlvo && parseInt(tMes) === mesAlvo) {
+        // 2. Saldo Mensal: Se mês for 'todos', acumula todos os meses do ano filtrado (ou global se ano for 'todos')
+        const passaFiltroAnoParaMes = (filtroAno === 'todos' || tAno === filtroAno);
+        const passaFiltroMes = (filtroMes === 'todos' || parseInt(tMes) === parseInt(filtroMes));
+        if (passaFiltroAnoParaMes && passaFiltroMes) {
             totalMensal += tVal;
         }
 
+        // 3. Saldo Semanal: Se semana for 'todos', acumula todas as semanas do mês/ano filtrados
         const dNum = parseInt(tDia);
         const tSemana = dNum <= 7 ? 1 : dNum <= 14 ? 2 : dNum <= 21 ? 3 : 4;
-        const semanaAlvo = filtroSemana !== 'todas' ? parseInt(filtroSemana) : semanaAtualNum;
-        if (tAno === anoAlvo && parseInt(tMes) === mesAlvo && tSemana === semanaAlvo) {
+        const passaFiltroSemana = (filtroSemana === 'todas' || tSemana === parseInt(filtroSemana));
+        if (passaFiltroAnoParaMes && passaFiltroMes && passaFiltroSemana) {
             totalSemanal += tVal;
         }
     });
