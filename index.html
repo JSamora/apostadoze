@@ -385,7 +385,7 @@
     <!-- Script de Lógica Principal -->
     <script src="app.js"></script>
     <script>
-        // Intercepta e ajusta o comportamento do extrato quando o filtro de datas está desmarcado
+        // Intercepta e ajusta o comportamento do extrato com base no estado do checkbox
         window.addEventListener('DOMContentLoaded', () => {
             if (typeof atualizarExtrato === 'function') {
                 const originalAtualizarExtrato = atualizarExtrato;
@@ -395,13 +395,14 @@
                     const inputInicio = document.getElementById('extrato-data-inicio');
                     const inputFim = document.getElementById('extrato-data-fim');
 
-                    if (checkboxFiltro && !checkboxFiltro.checked) {
-                        // Data de início fixa e segura
-                        if (inputInicio) inputInicio.value = "2000-01-01";
-                        
-                        // Data de fim dinâmica: calcula sempre 31 de dezembro do ano corrente de forma automática
-                        const anoAtual = new Date().getFullYear();
-                        if (inputFim) inputFim.value = `${anoAtual}-12-31`;
+                    if (checkboxFiltro) {
+                        if (!checkboxFiltro.checked) {
+                            // Se desmarcado: intervalo global (desde 2000 até ao fim do ano atual)
+                            if (inputInicio) inputInicio.value = "2000-01-01";
+                            
+                            const anoAtual = new Date().getFullYear();
+                            if (inputFim) inputFim.value = `${anoAtual}-12-31`;
+                        }
                     }
 
                     originalAtualizarExtrato();
@@ -409,13 +410,26 @@
             }
         });
 
-        // Alterna a visibilidade do container de datas e força a atualização do extrato
+        // Alterna a visibilidade dos campos e define o mês atual (do dia 1 até hoje) ao marcar
         function toggleFiltroDatas() {
             const ativo = document.getElementById('filtro-datas-ativo').checked;
             const containerDatas = document.getElementById('container-inputs-datas');
+            const inputInicio = document.getElementById('extrato-data-inicio');
+            const inputFim = document.getElementById('extrato-data-fim');
             
             if (containerDatas) {
                 containerDatas.classList.toggle('hidden', !ativo);
+            }
+
+            if (ativo) {
+                // Ao voltar a marcar: define o período desde o dia 1 do mês atual até à data atual (hoje)
+                const agora = new Date();
+                const ano = agora.getFullYear();
+                const mes = String(agora.getMonth() + 1).padStart(2, '0');
+                const hojeStr = agora.toISOString().split('T')[0];
+
+                if (inputInicio) inputInicio.value = `${ano}-${mes}-01`;
+                if (inputFim) inputFim.value = hojeStr;
             }
             
             if (typeof atualizarExtrato === 'function') {
