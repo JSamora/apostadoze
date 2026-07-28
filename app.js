@@ -1,7 +1,7 @@
 // URL oficial do Google Apps Script (Webhook / Exec)
 const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzguUt8QaomXrh_CBGiwRKBDAMTkNKKrSxe7qMZuKT1pexKT9H7idvOuZwJ4-mEwXnDcg/exec";
 
-// Estado atual da aplicação em memória
+// Estado inicial da aplicação estruturado como objeto
 let state = {
     apostas: [],
     raspadinhas: [],
@@ -9,13 +9,54 @@ let state = {
     orcamento: 0
 };
 
-// Arranque automático: Assim que a página abre, sincroniza imediatamente com a nuvem
+// Chave para armazenamento local no browser
+const LOCAL_STORAGE_KEY = 'apostas_do_ze_dados';
+
+// Inicialização da Aplicação
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log("A iniciar a aplicação Apostas do Zé e a sincronizar com a nuvem...");
+    console.log("A iniciar a aplicação Apostas do Zé (Modo Estável Híbrido)...");
+    
+    // 1. Carrega primeiro os dados locais para a interface aparecer instantaneamente
+    carregarDadosLocais();
+    
+    // 2. Tenta sincronizar de imediato com a nuvem em segundo plano[cite: 1]
     await carregarDadosDaNuvem();
+    
+    // 3. Renderiza a interface
+    renderApp();
 });
 
-// Sincroniza e puxa os dados do Google Drive
+// Carrega os dados guardados no localStorage do browser
+function carregarDadosLocais() {
+    const dadosSalvos = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (dadosSalvos) {
+        try {
+            const parsed = JSON.parse(dadosSalvos);
+            state = {
+                apostas: parsed.apostas || [],
+                raspadinhas: parsed.raspadinhas || [],
+                transacoes: parsed.transacoes || [],
+                orcamento: parsed.orcamento || 0
+            };
+        } catch (e) {
+            console.error("Erro ao interpretar dados locais:", e);
+        }
+    }
+}
+
+// Guarda no localStorage, atualiza a interface e envia automaticamente para a Nuvem
+async function guardarDados() {
+    // Guarda localmente para garantir que nunca se perde nada no browser
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
+    
+    // Atualiza imediatamente a interface visual
+    renderApp();
+    
+    // Envia para o Google Drive em background[cite: 1]
+    await guardarDadosNaNuvem();
+}
+
+// Sincroniza dados da Nuvem (Google Drive)[cite: 1]
 async function carregarDadosDaNuvem() {
     try {
         const resposta = await fetch(WEB_APP_URL);
@@ -28,15 +69,18 @@ async function carregarDadosDaNuvem() {
                 transacoes: dadosNuvem.transacoes || [],
                 orcamento: dadosNuvem.orcamento || 0
             };
+            
+            // Grava no localStorage a versão mais recente da nuvem
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
             renderApp();
             console.log("Dados sincronizados com sucesso a partir da nuvem!");
         }
     } catch (erro) {
-        console.error("Erro ao carregar dados da nuvem:", erro);
+        console.error("Aviso: Não foi possível ligar à nuvem. A usar dados locais.", erro);
     }
 }
 
-// Envia os dados atualizados para o Google Apps Script gravar no Google Drive
+// Envia os dados atuais para o Google Apps Script gravar no Google Drive[cite: 1]
 async function guardarDadosNaNuvem() {
     try {
         const payload = JSON.stringify(state);
@@ -46,9 +90,9 @@ async function guardarDadosNaNuvem() {
         const resultado = await resposta.json();
         
         if (resultado.status === "success") {
-            console.log("Dados guardados na nuvem com sucesso!");
+            console.log("Dados enviados para o Google Drive com sucesso!");
         } else {
-            console.error("Erro do servidor ao guardar:", resultado.error);
+            console.error("Erro reportado pelo servidor:", resultado.error);
         }
     } catch (erro) {
         console.error("Erro ao guardar dados na nuvem:", erro);
@@ -56,10 +100,10 @@ async function guardarDadosNaNuvem() {
 }
 
 // ==========================================
-// Funções de Gestão de Dados (Ações)
+// Funções de Gestão de Dados (Ações da App)
 // ==========================================
 
-async function adicionarAposta(modalidade, equipaA, equipaB, valor, odd, estado, data) {
+function adicionarAposta(modalidade, equipaA, equipaB, valor, odd, estado, data) {
     state.apostas.push({ 
         id: Date.now(), 
         modalidade, 
@@ -70,11 +114,10 @@ async function adicionarAposta(modalidade, equipaA, equipaB, valor, odd, estado,
         estado, 
         data 
     });
-    await guardarDadosNaNuvem();
-    renderApp();
+    guardarDados();
 }
 
-async function adicionarRaspadinha(nome, custo, premio, data) {
+function adicionarRaspadinha(nome, custo, premio, data) {
     state.raspadinhas.push({ 
         id: Date.now(), 
         nome, 
@@ -82,26 +125,23 @@ async function adicionarRaspadinha(nome, custo, premio, data) {
         premio: Number(premio), 
         data 
     });
-    await guardarDadosNaNuvem();
-    renderApp();
+    guardarDados();
 }
 
-async function adicionarTransacao(tipo, valor, data) { // 'deposito' ou 'levantamento'
+function adicionarTransacao(tipo, valor, data) { // 'deposito' ou 'levantamento'
     state.transacoes.push({ 
         id: Date.now(), 
         tipo, 
         valor: Number(valor), 
         data 
     });
-    await guardarDadosNaNuvem();
-    renderApp();
+    guardarDados();
 }
 
-async function limparDadosNaNuvemETotais() {
-    if (confirm("Tens a certeza que pretendes limpar todos os dados na nuvem?")) {
+function limparDadosLocaisETotais() {
+    if (confirm("Tens a certeza que pretendes limpar todos os dados?")) {
         state = { apostas: [], raspadinhas: [], transacoes: [], orcamento: 0 };
-        await guardarDadosNaNuvem();
-        renderApp();
+        guardarDados();
     }
 }
 
@@ -140,10 +180,10 @@ function renderApp() {
 
             <div class="flex space-x-3 pt-2">
                 <button onclick="carregarDadosDaNuvem()" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-semibold transition">
-                    🔄 Sincronizar Agora
+                    🔄 Sincronizar Nuvem
                 </button>
-                <button onclick="limparDadosNaNuvemETotais()" class="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-semibold transition">
-                    🗑️ Apagar Tudo
+                <button onclick="limparDadosLocaisETotais()" class="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-semibold transition">
+                    🗑️ Limpar Tudo
                 </button>
             </div>
         </div>
