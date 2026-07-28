@@ -546,6 +546,12 @@ function povoarAnosFiltro() {
 function atualizarExtrato() {
     const tbody = document.getElementById('tabela-extrato');
     const contadorExtrato = document.getElementById('extrato-contador');
+    
+    // Elementos dos Cards de Resumo (Saldo Anual, Mensal, Semanal)
+    const elSaldoAnual = document.getElementById('saldo-anual') || document.querySelector('.saldo-anual') || document.getElementById('card-saldo-anual');
+    const elSaldoMensal = document.getElementById('saldo-mensal') || document.querySelector('.saldo-mensal') || document.getElementById('card-saldo-mensal');
+    const elSaldoSemanal = document.getElementById('saldo-semanal') || document.querySelector('.saldo-semanal') || document.getElementById('card-saldo-semanal');
+
     if (!tbody) return;
 
     const filtroAno = document.getElementById('filtro-ano').value;
@@ -556,28 +562,76 @@ function atualizarExtrato() {
 
     dadosApp.apostas.forEach(a => {
         if (a.estado === 'Perdeu') {
-            transacoes.push({ data: a.data, desc: `Aposta Perdida: ${a.equipaA} vs ${a.equipaB}`, debito: a.valor, credito: 0 });
+            transacoes.push({ data: a.data, desc: `Aposta Perdida: ${a.equipaA} vs ${a.equipaB}`, debito: a.valor, credito: 0, tipo: 'aposta' });
         } else if (a.estado === 'Venceu') {
-            transacoes.push({ data: a.data, desc: `Aposta Vencida: ${a.equipaA} vs ${a.equipaB}`, debito: 0, credito: (a.valor * a.odd) - a.valor });
+            let lucro = (a.valor * a.odd) - a.valor;
+            transacoes.push({ data: a.data, desc: `Aposta Vencida: ${a.equipaA} vs ${a.equipaB}`, debito: 0, credito: lucro, tipo: 'aposta' });
         }
     });
 
     dadosApp.raspadinhas.forEach(r => {
-        transacoes.push({ data: r.data, desc: `Raspadinha: ${r.nome} (Custo)`, debito: r.custo, credito: 0 });
+        transacoes.push({ data: r.data, desc: `Raspadinha: ${r.nome} (Custo)`, debito: r.custo, credito: 0, tipo: 'raspadinha' });
         if (r.estado === 'Premiado' && r.premio > 0) {
-            transacoes.push({ data: r.data, desc: `Prémio Raspadinha: ${r.nome}`, debito: 0, credito: r.premio });
+            transacoes.push({ data: r.data, desc: `Prémio Raspadinha: ${r.nome}`, debito: 0, credito: r.premio, tipo: 'raspadinha' });
         }
     });
 
     dadosApp.movimentosCaixa.forEach(m => {
         if (m.subtipo === 'deposito') {
-            transacoes.push({ data: m.data, desc: `Depósito de Capital`, debito: 0, credito: m.valor });
+            transacoes.push({ data: m.data, desc: `Depósito de Capital`, debito: 0, credito: m.valor, tipo: 'caixa' });
         } else if (m.subtipo === 'levantamento') {
-            transacoes.push({ data: m.data, desc: `Levantamento de Capital`, debito: m.valor, credito: 0 });
+            transacoes.push({ data: m.data, desc: `Levantamento de Capital`, debito: m.valor, credito: 0, tipo: 'caixa' });
         }
     });
 
     transacoes.sort((a, b) => new Date(a.data) - new Date(b.data));
+
+    // Cálculo dos totais para os cartões de resumo superior (Anual, Mensal, Semanal)
+    let totalAnual = 0;
+    let totalMensal = 0;
+    let totalSemanal = 0;
+
+    const agora = new Date();
+    const anoAtualStr = agora.getFullYear().toString();
+    const mesAtualNum = agora.getMonth() + 1;
+    const diaAtualNum = agora.getDate();
+    const semanaAtualNum = diaAtualNum <= 7 ? 1 : diaAtualNum <= 14 ? 2 : diaAtualNum <= 21 ? 3 : 4;
+
+    transacoes.forEach(t => {
+        if (!t.data) return;
+        const [tAno, tMes, tDia] = t.data.split('-');
+        const tVal = t.credito - t.debito;
+
+        const anoAlvo = filtroAno !== 'todos' ? filtroAno : anoAtualStr;
+        if (tAno === anoAlvo) {
+            totalAnual += tVal;
+        }
+
+        const mesAlvo = filtroMes !== 'todos' ? parseInt(filtroMes) : mesAtualNum;
+        if (tAno === anoAlvo && parseInt(tMes) === mesAlvo) {
+            totalMensal += tVal;
+        }
+
+        const dNum = parseInt(tDia);
+        const tSemana = dNum <= 7 ? 1 : dNum <= 14 ? 2 : dNum <= 21 ? 3 : 4;
+        const semanaAlvo = filtroSemana !== 'todas' ? parseInt(filtroSemana) : semanaAtualNum;
+        if (tAno === anoAlvo && parseInt(tMes) === mesAlvo && tSemana === semanaAlvo) {
+            totalSemanal += tVal;
+        }
+    });
+
+    if (elSaldoAnual) {
+        elSaldoAnual.innerText = `${totalAnual >= 0 ? '+' : ''}${totalAnual.toFixed(2)} €`;
+        elSaldoAnual.className = `text-center font-bold text-base ${totalAnual >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+    }
+    if (elSaldoMensal) {
+        elSaldoMensal.innerText = `${totalMensal >= 0 ? '+' : ''}${totalMensal.toFixed(2)} €`;
+        elSaldoMensal.className = `text-center font-bold text-base ${totalMensal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+    }
+    if (elSaldoSemanal) {
+        elSaldoSemanal.innerText = `${totalSemanal >= 0 ? '+' : ''}${totalSemanal.toFixed(2)} €`;
+        elSaldoSemanal.className = `text-center font-bold text-base ${totalSemanal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+    }
 
     let filtradas = transacoes.filter(t => {
         if (!t.data) return false;
