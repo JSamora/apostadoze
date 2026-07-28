@@ -1,7 +1,7 @@
-// URL oficial do Google Apps Script (Webhook / Exec)
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzguUt8QaomXrh_CBGiwRKBDAMTkNKKrSxe7qMZuKT1pexKT9H7idvOuZwJ4-mEwXnDcg/exec";
+// URL oficial do Google Apps Script (Novo Webhook / Exec)
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzM70jBc3LfZm0FOikdPgsVs-jSjdIScdI_Y44f_mU0zDCX9EFmdUeBY5usN91mfh5vkw/exec";
 
-// Estado inicial da aplicação estruturado como objeto
+// Estado inicial da aplicação estruturado como objeto de raiz
 let state = {
     apostas: [],
     raspadinhas: [],
@@ -14,12 +14,12 @@ const LOCAL_STORAGE_KEY = 'apostas_do_ze_dados';
 
 // Inicialização da Aplicação
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log("A iniciar a aplicação Apostas do Zé (Modo Estável Híbrido)...");
+    console.log("A iniciar a aplicação com o novo JSON de raiz e link limpo...");
     
     // 1. Carrega primeiro os dados locais para a interface aparecer instantaneamente
     carregarDadosLocais();
     
-    // 2. Tenta sincronizar de imediato com a nuvem em segundo plano[cite: 1]
+    // 2. Sincroniza de imediato com a nova nuvem em segundo plano
     await carregarDadosDaNuvem();
     
     // 3. Renderiza a interface
@@ -46,17 +46,12 @@ function carregarDadosLocais() {
 
 // Guarda no localStorage, atualiza a interface e envia automaticamente para a Nuvem
 async function guardarDados() {
-    // Guarda localmente para garantir que nunca se perde nada no browser
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
-    
-    // Atualiza imediatamente a interface visual
     renderApp();
-    
-    // Envia para o Google Drive em background[cite: 1]
     await guardarDadosNaNuvem();
 }
 
-// Sincroniza dados da Nuvem (Google Drive)[cite: 1]
+// Sincroniza dados do novo JSON na Nuvem
 async function carregarDadosDaNuvem() {
     try {
         const resposta = await fetch(WEB_APP_URL);
@@ -70,17 +65,16 @@ async function carregarDadosDaNuvem() {
                 orcamento: dadosNuvem.orcamento || 0
             };
             
-            // Grava no localStorage a versão mais recente da nuvem
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
             renderApp();
-            console.log("Dados sincronizados com sucesso a partir da nuvem!");
+            console.log("Dados sincronizados com sucesso a partir do novo link!");
         }
     } catch (erro) {
         console.error("Aviso: Não foi possível ligar à nuvem. A usar dados locais.", erro);
     }
 }
 
-// Envia os dados atuais para o Google Apps Script gravar no Google Drive[cite: 1]
+// Envia os dados atuais para criar/atualizar o novo JSON no Google Drive
 async function guardarDadosNaNuvem() {
     try {
         const payload = JSON.stringify(state);
@@ -90,7 +84,7 @@ async function guardarDadosNaNuvem() {
         const resultado = await resposta.json();
         
         if (resultado.status === "success") {
-            console.log("Dados enviados para o Google Drive com sucesso!");
+            console.log("Novo JSON atualizado na nuvem com sucesso!");
         } else {
             console.error("Erro reportado pelo servidor:", resultado.error);
         }
@@ -128,7 +122,7 @@ function adicionarRaspadinha(nome, custo, premio, data) {
     guardarDados();
 }
 
-function adicionarTransacao(tipo, valor, data) { // 'deposito' ou 'levantamento'
+function adicionarTransacao(tipo, valor, data) { 
     state.transacoes.push({ 
         id: Date.now(), 
         tipo, 
