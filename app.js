@@ -9,13 +9,13 @@ let state = {
     orcamento: 0
 };
 
-// Inicialização da Aplicação - Vai buscar sempre os dados frescos ao Google Drive logo ao abrir
+// Arranque automático: Assim que a página abre, sincroniza imediatamente com a nuvem
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log("A iniciar a aplicação Apostas do Zé (Modo Online Direto)...");
+    console.log("A iniciar a aplicação Apostas do Zé e a sincronizar com a nuvem...");
     await carregarDadosDaNuvem();
 });
 
-// Sincroniza e puxa os dados diretamente do Google Drive
+// Sincroniza e puxa os dados do Google Drive
 async function carregarDadosDaNuvem() {
     try {
         const resposta = await fetch(WEB_APP_URL);
@@ -29,35 +29,35 @@ async function carregarDadosDaNuvem() {
                 orcamento: dadosNuvem.orcamento || 0
             };
             renderApp();
-            console.log("Dados carregados da nuvem com sucesso!");
+            console.log("Dados sincronizados com sucesso a partir da nuvem!");
         }
     } catch (erro) {
         console.error("Erro ao carregar dados da nuvem:", erro);
     }
 }
 
-// Envia os dados atuais diretamente para o Google Apps Script gravar no Google Drive
+// Envia os dados atualizados para o Google Apps Script gravar no Google Drive
 async function guardarDadosNaNuvem() {
     try {
         const payload = JSON.stringify(state);
-        
-        // Enviamos via parâmetro GET 'salvar', o que contorna qualquer restrição de POST ou CORS
         const urlComDados = `${WEB_APP_URL}?salvar=${encodeURIComponent(payload)}`;
         
         const resposta = await fetch(urlComDados);
         const resultado = await resposta.json();
         
         if (resultado.status === "success") {
-            console.log("Dados gravados com sucesso na nuvem!");
+            console.log("Dados guardados na nuvem com sucesso!");
         } else {
-            console.error("Erro reportado pelo servidor:", resultado.error);
+            console.error("Erro do servidor ao guardar:", resultado.error);
         }
     } catch (erro) {
         console.error("Erro ao guardar dados na nuvem:", erro);
     }
 }
 
-// Funções de Gestão de Dados (Modificam o estado e gravam imediatamente na nuvem)
+// ==========================================
+// Funções de Gestão de Dados (Ações)
+// ==========================================
 
 async function adicionarAposta(modalidade, equipaA, equipaB, valor, odd, estado, data) {
     state.apostas.push({ 
@@ -121,7 +121,7 @@ function renderApp() {
 
     container.innerHTML = `
         <div class="p-6 bg-slate-900 text-white rounded-xl shadow-xl max-w-xl mx-auto space-y-4">
-            <h2 class="text-2xl font-bold border-b border-slate-700 pb-2">Painel - Apostas do Zé (Online)</h2>
+            <h2 class="text-2xl font-bold border-b border-slate-700 pb-2">Painel - Apostas do Zé</h2>
             
             <div class="grid grid-cols-2 gap-4 text-sm">
                 <div class="bg-slate-800 p-3 rounded-lg">
@@ -140,7 +140,7 @@ function renderApp() {
 
             <div class="flex space-x-3 pt-2">
                 <button onclick="carregarDadosDaNuvem()" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-semibold transition">
-                    🔄 Atualizar da Nuvem
+                    🔄 Sincronizar Agora
                 </button>
                 <button onclick="limparDadosNaNuvemETotais()" class="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-semibold transition">
                     🗑️ Apagar Tudo
