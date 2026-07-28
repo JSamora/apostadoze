@@ -547,7 +547,7 @@ function atualizarExtrato() {
     const tbody = document.getElementById('tabela-extrato');
     const contadorExtrato = document.getElementById('extrato-contador');
     
-    // Elementos dos Cards de Resumo (Saldo Anual, Mensal, Semanal)
+    // Elementos dos Cards de Resumo (Saldo Anual/Global, Mensal, Semanal)
     const elSaldoAnual = document.getElementById('saldo-anual') || document.querySelector('.saldo-anual') || document.getElementById('card-saldo-anual');
     const elSaldoMensal = document.getElementById('saldo-mensal') || document.querySelector('.saldo-mensal') || document.getElementById('card-saldo-mensal');
     const elSaldoSemanal = document.getElementById('saldo-semanal') || document.querySelector('.saldo-semanal') || document.getElementById('card-saldo-semanal');
@@ -586,7 +586,7 @@ function atualizarExtrato() {
 
     transacoes.sort((a, b) => new Date(a.data) - new Date(b.data));
 
-    // Cálculo dos totais para os cartões de resumo superior (Anual, Mensal, Semanal)
+    // Cálculo dos totais para os cartões de resumo superior (Anual/Global, Mensal, Semanal)
     let totalAnual = 0;
     let totalMensal = 0;
     let totalSemanal = 0;
@@ -602,11 +602,12 @@ function atualizarExtrato() {
         const [tAno, tMes, tDia] = t.data.split('-');
         const tVal = t.credito - t.debito;
 
-        const anoAlvo = filtroAno !== 'todos' ? filtroAno : anoAtualStr;
-        if (tAno === anoAlvo) {
+        // Se o filtro for 'Todos', acumula o global histórico de todos os anos
+        if (filtroAno === 'todos' || tAno === filtroAno) {
             totalAnual += tVal;
         }
 
+        const anoAlvo = filtroAno !== 'todos' ? filtroAno : anoAtualStr;
         const mesAlvo = filtroMes !== 'todos' ? parseInt(filtroMes) : mesAtualNum;
         if (tAno === anoAlvo && parseInt(tMes) === mesAlvo) {
             totalMensal += tVal;
