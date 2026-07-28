@@ -229,48 +229,28 @@
                             <i class="fa-solid fa-file-pdf"></i> Gerar Extrato
                         </button>
                     </div>
-                    <div class="grid grid-cols-3 gap-2">
-                        <div>
-                            <label class="text-[9px] text-slate-400">Ano</label>
-                            <select id="filtro-ano" onchange="atualizarExtrato()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-white">
-                                <option value="todos">Todos</option>
-                            </select>
+                    <!-- Filtros por Intervalo de Datas -->
+                    <div class="flex flex-wrap gap-2 items-center bg-slate-900/50 p-2 rounded-xl border border-slate-700">
+                        <div class="flex flex-col text-xs flex-1">
+                            <label class="text-[9px] text-slate-400 mb-1">Data Início</label>
+                            <input type="date" id="extrato-data-inicio" onchange="atualizarExtrato()" class="bg-slate-900 border border-slate-700 text-white rounded px-2 py-1 text-xs">
                         </div>
-                        <div>
-                            <label class="text-[9px] text-slate-400">Mês</label>
-                            <select id="filtro-mes" onchange="atualizarExtrato()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-white">
-                                <option value="todos">Todos</option>
-                                <option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option>
-                                <option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option>
-                                <option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option>
-                                <option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="text-[9px] text-slate-400">Semana</label>
-                            <select id="filtro-semana" onchange="atualizarExtrato()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-white">
-                                <option value="todas">Todas</option>
-                                <option value="1">Semana 1 (1-7)</option>
-                                <option value="2">Semana 2 (8-14)</option>
-                                <option value="3">Semana 3 (15-21)</option>
-                                <option value="4">Semana 4+ (22-31)</option>
-                            </select>
+                        <div class="flex flex-col text-xs flex-1">
+                            <label class="text-[9px] text-slate-400 mb-1">Data Fim</label>
+                            <input type="date" id="extrato-data-fim" onchange="atualizarExtrato()" class="bg-slate-900 border border-slate-700 text-white rounded px-2 py-1 text-xs">
                         </div>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-3 gap-2 shrink-0">
+                <!-- Cartões de Resumo do Extrato -->
+                <div class="grid grid-cols-2 gap-2 shrink-0">
                     <div class="bg-slate-800 border border-slate-700 p-2.5 rounded-xl text-center">
-                        <p class="text-[9px] uppercase text-slate-400">Saldo Anual</p>
-                        <p id="saldo-anual" class="text-xs font-bold text-emerald-400 mt-0.5">0.00 €</p>
+                        <span class="text-[9px] uppercase text-slate-400 block">Saldo Anterior</span>
+                        <span id="saldo-anterior" class="text-xs font-bold text-emerald-400 mt-0.5 block">0.00 €</span>
                     </div>
                     <div class="bg-slate-800 border border-slate-700 p-2.5 rounded-xl text-center">
-                        <p class="text-[9px] uppercase text-slate-400">Saldo Mensal</p>
-                        <p id="saldo-mensal" class="text-xs font-bold text-emerald-400 mt-0.5">0.00 €</p>
-                    </div>
-                    <div class="bg-slate-800 border border-slate-700 p-2.5 rounded-xl text-center">
-                        <p class="text-[9px] uppercase text-slate-400">Saldo Semanal</p>
-                        <p id="saldo-semanal" class="text-xs font-bold text-emerald-400 mt-0.5">0.00 €</p>
+                        <span class="text-[9px] uppercase text-slate-400 block">Resultado do Período</span>
+                        <span id="saldo-periodo" class="text-xs font-bold text-emerald-400 mt-0.5 block">0.00 €</span>
                     </div>
                 </div>
 
