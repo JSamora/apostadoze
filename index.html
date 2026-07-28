@@ -385,44 +385,37 @@
     <!-- Script de Lógica Principal -->
     <script src="app.js"></script>
     <script>
-        // Função auxiliar para encontrar a data do primeiro movimento existente na aplicação
-        function obterDataMaisAntiga() {
-            let datas = [];
-            
-            if (typeof apostas !== 'undefined' && Array.isArray(apostas)) {
-                apostas.forEach(a => { if (a.data) datas.push(a.data); });
-            }
-            if (typeof raspadinhas !== 'undefined' && Array.isArray(raspadinhas)) {
-                raspadinhas.forEach(r => { if (r.data) datas.push(r.data); });
-            }
-            if (typeof caixaMovimentos !== 'undefined' && Array.isArray(caixaMovimentos)) {
-                caixaMovimentos.forEach(c => { if (c.data) datas.push(c.data); });
-            }
+        // Intercepta e ajusta o comportamento do extrato quando o filtro de datas está desmarcado
+        window.addEventListener('DOMContentLoaded', () => {
+            if (typeof atualizarExtrato === 'function') {
+                const originalAtualizarExtrato = atualizarExtrato;
+                
+                atualizarExtrato = function() {
+                    const checkboxFiltro = document.getElementById('filtro-datas-ativo');
+                    const inputInicio = document.getElementById('extrato-data-inicio');
+                    const inputFim = document.getElementById('extrato-data-fim');
 
-            if (datas.length === 0) {
-                return new Date().toISOString().split('T')[0];
+                    if (checkboxFiltro && !checkboxFiltro.checked) {
+                        // Data de início fixa e segura
+                        if (inputInicio) inputInicio.value = "2000-01-01";
+                        
+                        // Data de fim dinâmica: calcula sempre 31 de dezembro do ano corrente de forma automática
+                        const anoAtual = new Date().getFullYear();
+                        if (inputFim) inputFim.value = `${anoAtual}-12-31`;
+                    }
+
+                    originalAtualizarExtrato();
+                };
             }
+        });
 
-            datas.sort();
-            return datas[0];
-        }
-
-        // Função ajustada: esconde/mostra os inputs e preenche automaticamente desde o primeiro registo até hoje se desmarcado
+        // Alterna a visibilidade do container de datas e força a atualização do extrato
         function toggleFiltroDatas() {
             const ativo = document.getElementById('filtro-datas-ativo').checked;
             const containerDatas = document.getElementById('container-inputs-datas');
-            const inputInicio = document.getElementById('extrato-data-inicio');
-            const inputFim = document.getElementById('extrato-data-fim');
             
             if (containerDatas) {
                 containerDatas.classList.toggle('hidden', !ativo);
-            }
-
-            const hojeStr = new Date().toISOString().split('T')[0];
-
-            if (!ativo) {
-                if (inputInicio) inputInicio.value = obterDataMaisAntiga();
-                if (inputFim) inputFim.value = hojeStr;
             }
             
             if (typeof atualizarExtrato === 'function') {
