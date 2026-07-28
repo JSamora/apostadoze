@@ -9,6 +9,9 @@ let state = {
     orcamento: 0
 };
 
+// Aba ativa atual
+let abaAtual = 'dashboard';
+
 // Chave para armazenamento local no browser
 const LOCAL_STORAGE_KEY = 'apostas_do_ze_dados';
 
@@ -25,6 +28,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 3. Renderiza a interface
     renderApp();
 });
+
+// Função de navegação entre abas chamada pelo HTML
+function mudarAba(aba) {
+    abaAtual = aba;
+    renderApp();
+}
 
 // Carrega os dados guardados no localStorage do browser
 function carregarDadosLocais() {
