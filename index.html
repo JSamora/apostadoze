@@ -64,7 +64,7 @@
         <!-- Conteúdo Global da App -->
         <div class="flex-1 overflow-hidden p-3 flex flex-col">
             
-            <!-- Painel de Banca Global (Simplificado e Compacto) -->
+            <!-- Painel de Banca Global -->
             <div class="bg-gradient-to-r from-emerald-600 to-teal-700 p-3.5 rounded-2xl shadow-lg text-white mb-2.5 shrink-0">
                 <div class="flex justify-between items-center">
                     <div>
@@ -233,7 +233,7 @@
                         </button>
                     </div>
 
-                    <!-- Filtros por Intervalo de Datas (Oculta-se automaticamente se desmarcado) -->
+                    <!-- Filtros por Intervalo de Datas -->
                     <div id="container-inputs-datas" class="flex flex-wrap gap-2 items-center bg-slate-900/50 p-2 rounded-xl border border-slate-700 transition-all">
                         <div class="flex flex-col text-xs flex-1">
                             <label class="text-[9px] text-slate-400 mb-1">Data Início</label>
@@ -385,13 +385,44 @@
     <!-- Script de Lógica Principal -->
     <script src="app.js"></script>
     <script>
-        // Função auxiliar interna para garantir o comportamento de ocultar/mostrar e resetar o filtro no extrato
+        // Função auxiliar para encontrar a data do primeiro movimento existente na aplicação
+        function obterDataMaisAntiga() {
+            let datas = [];
+            
+            if (typeof apostas !== 'undefined' && Array.isArray(apostas)) {
+                apostas.forEach(a => { if (a.data) datas.push(a.data); });
+            }
+            if (typeof raspadinhas !== 'undefined' && Array.isArray(raspadinhas)) {
+                raspadinhas.forEach(r => { if (r.data) datas.push(r.data); });
+            }
+            if (typeof caixaMovimentos !== 'undefined' && Array.isArray(caixaMovimentos)) {
+                caixaMovimentos.forEach(c => { if (c.data) datas.push(c.data); });
+            }
+
+            if (datas.length === 0) {
+                return new Date().toISOString().split('T')[0];
+            }
+
+            datas.sort();
+            return datas[0];
+        }
+
+        // Função ajustada: esconde/mostra os inputs e preenche automaticamente desde o primeiro registo até hoje se desmarcado
         function toggleFiltroDatas() {
             const ativo = document.getElementById('filtro-datas-ativo').checked;
             const containerDatas = document.getElementById('container-inputs-datas');
+            const inputInicio = document.getElementById('extrato-data-inicio');
+            const inputFim = document.getElementById('extrato-data-fim');
             
             if (containerDatas) {
                 containerDatas.classList.toggle('hidden', !ativo);
+            }
+
+            const hojeStr = new Date().toISOString().split('T')[0];
+
+            if (!ativo) {
+                if (inputInicio) inputInicio.value = obterDataMaisAntiga();
+                if (inputFim) inputFim.value = hojeStr;
             }
             
             if (typeof atualizarExtrato === 'function') {
