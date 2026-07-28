@@ -1,111 +1,67 @@
 // URL oficial do Google Apps Script (Webhook / Exec)
 const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzguUt8QaomXrh_CBGiwRKBDAMTkNKKrSxe7qMZuKT1pexKT9H7idvOuZwJ4-mEwXnDcg/exec";
 
-// Estado inicial da aplicação estruturado como objeto
+// Estado atual da aplicação em memória
 let state = {
     apostas: [],
     raspadinhas: [],
-    transacoes: [], // depósitos e levantamentos
+    transacoes: [],
     orcamento: 0
 };
 
-// Chave para armazenamento local no browser
-const LOCAL_STORAGE_KEY = 'apostas_do_ze_dados';
-
-// Inicialização da Aplicação
+// Inicialização da Aplicação - Vai buscar sempre os dados frescos ao Google Drive logo ao abrir
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log("A iniciar a aplicação Apostas do Zé...");
-    
-    // 1. Carrega primeiro os dados locais para resposta imediata na interface
-    carregarDadosLocais();
-    
-    // 2. Sincroniza em segundo plano com o Google Drive para obter dados atualizados de outros dispositivos[cite: 1]
+    console.log("A iniciar a aplicação Apostas do Zé (Modo 100% Online)...");
     await carregarDadosDaNuvem();
-    
-    // 3. Renderiza a interface inicial
-    renderApp();
 });
 
-// Carrega os dados guardados no localStorage do browser
-function carregarDadosLocais() {
-    const dadosSalvos = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (dadosSalvos) {
-        try {
-            const parsed = JSON.parse(dadosSalvos);
-            // Garante que a estrutura respeita as chaves essenciais
-            state = {
-                apostas: parsed.apostas || [],
-                raspadinhas: parsed.raspadinhas || [],
-                transacoes: parsed.transacoes || [],
-                orcamento: parsed.orcamento || 0
-            };
-        } catch (e) {
-            console.error("Erro ao interpretar dados locais:", e);
-        }
-    }
-}
-
-// Guarda no localStorage, atualiza a interface e envia automaticamente para a Nuvem
-async function guardarDados() {
-    // Guarda localmente no browser para acesso imediato e offline
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
-    
-    // Atualiza imediatamente a interface visual
-    renderApp();
-    
-    // Envia os dados atualizados para o Google Drive em background
-    await guardarDadosNaNuvem();
-}
-
-// Sincroniza dados da Nuvem (Google Drive)[cite: 1]
+// Sincroniza e puxa os dados diretamente do Google Drive
 async function carregarDadosDaNuvem() {
     try {
         const resposta = await fetch(WEB_APP_URL);
         const dadosNuvem = await resposta.json();
         
         if (dadosNuvem && !dadosNuvem.error && typeof dadosNuvem === 'object') {
-            // Atualiza o estado local com os dados vindos da nuvem
             state = {
                 apostas: dadosNuvem.apostas || [],
                 raspadinhas: dadosNuvem.raspadinhas || [],
                 transacoes: dadosNuvem.transacoes || [],
                 orcamento: dadosNuvem.orcamento || 0
             };
-            
-            // Grava no localStorage para persistência local atualizada
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
-            
-            // Re-renderiza a interface com os dados mais recentes
             renderApp();
-            console.log("Dados sincronizados com sucesso a partir da nuvem!");
+            console.log("Dados atualizados a partir da nuvem com sucesso!");
         }
     } catch (erro) {
-        console.error("Aviso: Não foi possível ligar à nuvem. A usar dados locais.", erro);
+        console.error("Erro ao carregar dados da nuvem:", erro);
+        alert("Erro de ligação à nuvem. Verifica a tua internet.");
     }
 }
 
-// Envia os dados atuais para o Google Apps Script gravar no Google Drive
+// Envia os dados atuais diretamente para o Google Apps Script gravar no Google Drive
 async function guardarDadosNaNuvem() {
     try {
         const payload = JSON.stringify(state);
         
-        // Enviamos encapsulado num parâmetro de formulário para contornar restrições de CORS
-        await fetch(WEB_APP_URL, {
+        const resposta = await fetch(WEB_APP_URL, {
             method: 'POST',
             body: new URLSearchParams({ data: payload })
         });
         
-        console.log("Dados enviados para o Google Drive com sucesso!");
+        const resultado = await resposta.json();
+        if (resultado.status === "success") {
+            console.log("Dados gravados com sucesso na nuvem!");
+        } else {
+            console.error("Erro reportado pelo servidor:", resultado.message);
+        }
     } catch (erro) {
         console.error("Erro ao guardar dados na nuvem:", erro);
+        alert("Não foi possível guardar os dados na nuvem.");
     }
 }
 
-// ==========================================
-// Funções de Gestão de Dados (Ações da App)
-// ==========================================
+// Funções de Gestão de Dados (Modificam o estado e gravam imediatamente na nuvem)
 
-function adicionarAposta(modalidade, equipaA, equipaB, valor, odd, estado, data) {
+async function adicionarAposta(modalidade, equipaA, equipaB, valor, odd, estado, data) {
     state.apostas.push({ 
         id: Date.now(), 
         modalidade, 
@@ -116,10 +72,11 @@ function adicionarAposta(modalidade, equipaA, equipaB, valor, odd, estado, data)
         estado, 
         data 
     });
-    guardarDados();
+    await guardarDadosNaNuvem();
+    renderApp();
 }
 
-function adicionarRaspadinha(nome, custo, premio, data) {
+async function adicionarRaspadinha(nome, custo, premio, data) {
     state.raspadinhas.push({ 
         id: Date.now(), 
         nome, 
@@ -127,23 +84,26 @@ function adicionarRaspadinha(nome, custo, premio, data) {
         premio: Number(premio), 
         data 
     });
-    guardarDados();
+    await guardarDadosNaNuvem();
+    renderApp();
 }
 
-function adicionarTransacao(tipo, valor, data) { // 'deposito' ou 'levantamento'
+async function adicionarTransacao(tipo, valor, data) { // 'deposito' ou 'levantamento'
     state.transacoes.push({ 
         id: Date.now(), 
         tipo, 
         valor: Number(valor), 
         data 
     });
-    guardarDados();
+    await guardarDadosNaNuvem();
+    renderApp();
 }
 
-function limparDadosLocaisETotais() {
-    if (confirm("Tens a certeza que pretendes limpar todos os dados?")) {
+async function limparDadosNaNuvemETotais() {
+    if (confirm("Tens a certeza que pretendes limpar todos os dados na nuvem?")) {
         state = { apostas: [], raspadinhas: [], transacoes: [], orcamento: 0 };
-        guardarDados();
+        await guardarDadosNaNuvem();
+        renderApp();
     }
 }
 
@@ -155,7 +115,6 @@ function renderApp() {
     const container = document.getElementById('app-container');
     if (!container) return;
 
-    // Cálculo dos totais para exibição no painel
     let totalApostas = state.apostas.reduce((acc, curr) => acc + curr.valor, 0);
     let totalRaspadinhas = state.raspadinhas.reduce((acc, curr) => acc + curr.custo, 0);
     let totalPremiosRaspadinhas = state.raspadinhas.reduce((acc, curr) => acc + curr.premio, 0);
@@ -164,7 +123,7 @@ function renderApp() {
 
     container.innerHTML = `
         <div class="p-6 bg-slate-900 text-white rounded-xl shadow-xl max-w-xl mx-auto space-y-4">
-            <h2 class="text-2xl font-bold border-b border-slate-700 pb-2">Painel - Apostas do Zé</h2>
+            <h2 class="text-2xl font-bold border-b border-slate-700 pb-2">Painel - Apostas do Zé (Online)</h2>
             
             <div class="grid grid-cols-2 gap-4 text-sm">
                 <div class="bg-slate-800 p-3 rounded-lg">
@@ -183,10 +142,10 @@ function renderApp() {
 
             <div class="flex space-x-3 pt-2">
                 <button onclick="carregarDadosDaNuvem()" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-semibold transition">
-                    🔄 Sincronizar Nuvem
+                    🔄 Atualizar da Nuvem
                 </button>
-                <button onclick="limparDadosLocaisETotais()" class="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-semibold transition">
-                    🗑️ Limpar Tudo
+                <button onclick="limparDadosNaNuvemETotais()" class="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-semibold transition">
+                    🗑️ Apagar Tudo
                 </button>
             </div>
         </div>
