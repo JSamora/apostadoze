@@ -644,7 +644,7 @@ function atualizarGraficoLinhas() {
     let transacoes = [];
 
     dadosApp.apostas.forEach(a => {
-        if (a.estado === 'Perdido') transacoes.push({ data: a.data, val: -a.valor });
+        if (a.estado === 'Perdeu') transacoes.push({ data: a.data, val: -a.valor });
         if (a.estado === 'Venceu') transacoes.push({ data: a.data, val: (a.valor * a.odd) - a.valor });
     });
     dadosApp.raspadinhas.forEach(r => {
