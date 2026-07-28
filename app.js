@@ -1,796 +1,772 @@
-const DRIVE_API_URL = "https://script.google.com/macros/s/AKfycbzM70jBc3LfZm0FOikdPgsVs-jSjdIScdI_Y44f_mU0zDCX9EFmdUeBY5usN91mfh5vkw/exec";
+// ==========================================
+// APOSTAS DO ZÉ - SCRIPT PRINCIPAL UNIFICADO
+// ==========================================
 
-let bancaInicial = 100.00;
 let dadosApp = {
+    saldoInicial: 100.00,
     apostas: [],
     raspadinhas: [],
-    transacoes: []
+    movimentosCaixa: [] // Depósitos e Levantamentos
 };
 
-document.getElementById('data-aposta').valueAsDate = new Date();
-if (document.getElementById('data-raspadinha')) {
-    document.getElementById('data-raspadinha').valueAsDate = new Date();
-}
-if (document.getElementById('data-transacao')) {
-    document.getElementById('data-transacao').valueAsDate = new Date();
+// Inicialização ao carregar a página
+document.addEventListener('DOMContentLoaded', () => {
+    carregarDadosLocais();
+    preencherDataAtual();
+    renderizarTudo();
+});
+
+function preencherDataAtual() {
+    const hoje = new Date().toISOString().split('T')[0];
+    const elAposta = document.getElementById('data-aposta');
+    const elRaspadinha = document.getElementById('raspadinha-data');
+    const elSub = document.getElementById('modal-sub-data');
+    if (elAposta && !elAposta.value) elAposta.value = hoje;
+    if (elRaspadinha && !elRaspadinha.value) elRaspadinha.value = hoje;
+    if (elSub && !elSub.value) elSub.value = hoje;
 }
 
-function inicializarDatasMesAtual() {
-    let hoje = new Date();
-    let ano = hoje.getFullYear();
-    let mes = String(hoje.getMonth() + 1).padStart(2, '0');
-    let primeiroDia = `${ano}-${mes}-01`;
-    let ultimoDiaObj = new Date(ano, hoje.getMonth() + 1, 0);
-    let ultimoDia = `${ano}-${mes}-${String(ultimoDiaObj.getDate()).padStart(2, '0')}`;
+// Gestão de Abas
+const abasValidas = ['registo', 'raspadinhas', 'historico', 'extrato', 'graficos'];
+function mudarAba(abaDestino) {
+    abasValidas.forEach(aba => {
+        const secao = document.getElementById(`secao-${aba}`);
+        const btnTopo = document.getElementById(`tab-${aba}`);
+        const btnRodape = document.getElementById(`nav-btn-${aba}`);
 
-    if (document.getElementById('grafico-data-inicio')) {
-        document.getElementById('grafico-data-inicio').value = primeiroDia;
-        document.getElementById('grafico-data-fim').value = ultimoDia;
-    }
-}
-inicializarDatasMesAtual();
-
-async function carregarDadosDoDrive() {
-    let icon = document.getElementById('icon-sync');
-    if (icon) icon.classList.add('fa-spin');
-    
-    try {
-        let resposta = await fetch(DRIVE_API_URL);
-        let dados = await resposta.json();
-        
-        if (Array.isArray(dados)) {
-            dadosApp.apostas = dados;
-        } else if (dados) {
-            dadosApp.apostas = Array.isArray(dados.apostas) ? dados.apostas : [];
-            dadosApp.raspadinhas = Array.isArray(dados.raspadinhas) ? dados.raspadinhas : [];
-            dadosApp.transacoes = Array.isArray(dados.transacoes) ? dados.transacoes : [];
-            if (typeof dados.bancaInicial === 'number') {
-                bancaInicial = dados.bancaInicial;
+        if (aba === abaDestino) {
+            if (secao) secao.classList.remove('hidden');
+            if (btnTopo) {
+                btnTopo.classList.add('text-emerald-400', 'border-b-2', 'border-emerald-400');
+                btnTopo.classList.remove('text-slate-400');
+            }
+            if (btnRodape) {
+                btnRodape.classList.add('text-emerald-400');
+                btnRodape.classList.remove('text-slate-400');
+            }
+        } else {
+            if (secao) secao.classList.add('hidden');
+            if (btnTopo) {
+                btnTopo.classList.remove('text-emerald-400', 'border-b-2', 'border-emerald-400');
+                btnTopo.classList.add('text-slate-400');
+            }
+            if (btnRodape) {
+                btnRodape.classList.remove('text-emerald-400');
+                btnRodape.classList.add('text-slate-400');
             }
         }
-    } catch (erro) {
-        console.error("Erro ao carregar dados do Drive:", erro);
-    } finally {
+    });
+}
+
+// Armazenamento Local (Offline-First)
+function carregarDadosLocais() {
+    const salvo = localStorage.getItem('apostas_do_ze_dados');
+    if (salvo) {
+        try {
+            const parsed = JSON.parse(salvo);
+            dadosApp.saldoInicial = parsed.saldoInicial ?? 100.00;
+            dadosApp.apostas = parsed.apostas || [];
+            dadosApp.raspadinhas = parsed.raspadinhas || [];
+            dadosApp.movimentosCaixa = parsed.movimentosCaixa || [];
+        } catch (e) {
+            console.error('Erro ao carregar dados locais:', e);
+        }
+    }
+}
+
+function guardarDadosLocais() {
+    localStorage.setItem('apostas_do_ze_dados', JSON.stringify(dadosApp));
+}
+
+// Simulação de Sincronização com o Drive / Nuvem
+function carregarDadosDoDrive() {
+    const icon = document.getElementById('icon-sync');
+    if (icon) icon.classList.add('fa-spin');
+    
+    setTimeout(() => {
+        carregarDadosLocais();
+        renderizarTudo();
         if (icon) icon.classList.remove('fa-spin');
-        atualizarInterface();
+        alert('Dados sincronizados com sucesso!');
+    }, 800);
+}
+
+// Gestão de Definições / Menu da Engrenagem
+function abrirConfigBanca() {
+    const modal = document.getElementById('modal-definicoes');
+    const inputSaldo = document.getElementById('input-saldo-inicial');
+    if (inputSaldo) inputSaldo.value = dadosApp.saldoInicial;
+    if (modal) modal.classList.remove('hidden');
+}
+
+function fecharConfigBanca() {
+    const modal = document.getElementById('modal-definicoes');
+    if (modal) modal.classList.add('hidden');
+}
+
+function atualizarSaldoInicial() {
+    const val = parseFloat(document.getElementById('input-saldo-inicial').value);
+    if (!isNaN(val) && val >= 0) {
+        dadosApp.saldoInicial = val;
+        guardarDadosLocais();
+        renderizarTudo();
+        alert('Saldo inicial atualizado com sucesso!');
+        fecharConfigBanca();
+    } else {
+        alert('Por favor, insira um valor válido.');
     }
 }
 
-async function guardarDadosNoDrive() {
-    try {
-        let payload = {
-            bancaInicial: bancaInicial,
-            apostas: dadosApp.apostas,
-            raspadinhas: dadosApp.raspadinhas,
-            transacoes: dadosApp.transacoes
-        };
+// Controlo dos Sub-Modais de Depósito e Levantamento (dentro do menu)
+function abrirModalCaixaSub(tipo) {
+    fecharConfigBanca();
+    const modal = document.getElementById('modal-caixa-sub');
+    const titulo = document.getElementById('modal-sub-titulo');
+    const inputTipo = document.getElementById('modal-sub-tipo');
+    const inputValor = document.getElementById('modal-sub-valor');
+    
+    inputValor.value = '';
+    preencherDataAtual();
+    inputTipo.value = tipo;
 
-        await fetch(DRIVE_API_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-    } catch (erro) {
-        console.error("Erro ao guardar dados no Drive:", erro);
+    if (tipo === 'deposito') {
+        titulo.innerHTML = '<i class="fa-solid fa-arrow-down text-emerald-400"></i> Registar Depósito';
+    } else {
+        titulo.innerHTML = '<i class="fa-solid fa-arrow-up text-rose-400"></i> Registar Levantamento';
+    }
+
+    if (modal) modal.classList.remove('hidden');
+}
+
+function voltarConfigCaixa() {
+    const modalSub = document.getElementById('modal-caixa-sub');
+    if (modalSub) modalSub.classList.add('hidden');
+    abrirConfigBanca();
+}
+
+function confirmarMovimentoCaixaSub() {
+    const tipo = document.getElementById('modal-sub-tipo').value;
+    const valor = parseFloat(document.getElementById('modal-sub-valor').value);
+    const data = document.getElementById('modal-sub-data').value || new Date().toISOString().split('T')[0];
+
+    if (isNaN(valor) || valor <= 0) {
+        alert('Por favor, insira um valor válido.');
+        return;
+    }
+
+    dadosApp.movimentosCaixa.push({
+        tipo: 'caixa',
+        subtipo: tipo,
+        valor: valor,
+        data: data
+    });
+
+    guardarDadosLocais();
+    const modalSub = document.getElementById('modal-caixa-sub');
+    if (modalSub) modalSub.classList.add('hidden');
+    renderizarTudo();
+    alert(`${tipo === 'deposito' ? 'Depósito' : 'Levantamento'} registado com sucesso!`);
+}
+
+function apagarMovimentoCaixa(index) {
+    if (confirm('Tem a certeza que pretende apagar este movimento de caixa?')) {
+        dadosApp.movimentosCaixa.splice(index, 1);
+        guardarDadosLocais();
+        renderizarTudo();
     }
 }
 
-function mudarAba(aba) {
-    const secoes = ['secao-registo', 'secao-historico', 'secao-extrato', 'secao-graficos'];
-    secoes.forEach(id => {
-        let el = document.getElementById(id);
-        if (el) {
-            el.classList.add('hidden');
-            el.classList.remove('flex');
-        }
-    });
+// -----------------------------------------
+// GESTÃO DE APOSTAS
+// -----------------------------------------
+function guardarAposta() {
+    const modalidade = document.getElementById('modalidade-aposta').value;
+    const estado = document.getElementById('estado-aposta').value;
+    const equipaA = document.getElementById('equipa-a').value.trim();
+    const equipaB = document.getElementById('equipa-b').value.trim();
+    const valor = parseFloat(document.getElementById('valor-aposta').value);
+    const odd = parseFloat(document.getElementById('odd-aposta').value);
+    const data = document.getElementById('data-aposta').value || new Date().toISOString().split('T')[0];
+    const editIndex = parseInt(document.getElementById('edit-index').value);
 
-    ['tab-registo', 'tab-historico', 'tab-extrato', 'tab-graficos'].forEach(id => {
-        let el = document.getElementById(id);
-        if (el) el.className = "px-1 py-1 font-semibold text-slate-400 hover:text-slate-200 transition truncate";
-    });
+    if (!equipaA || !equipaB || isNaN(valor) || valor <= 0 || isNaN(odd) || odd <= 1) {
+        alert('Por favor, preencha todos os campos corretamente (ODD deve ser superior a 1.0).');
+        return;
+    }
 
-    ['nav-btn-registo', 'nav-btn-historico', 'nav-btn-extrato', 'nav-btn-graficos'].forEach(id => {
-        let el = document.getElementById(id);
-        if (el) el.className = "flex flex-col items-center hover:text-slate-200 text-slate-400";
-    });
+    const apostaObj = {
+        tipo: 'aposta',
+        modalidade,
+        estado,
+        equipaA,
+        equipaB,
+        valor,
+        odd,
+        data,
+        retornoPotencial: valor * odd
+    };
 
-    if (aba === 'registo') {
-        let el = document.getElementById('secao-registo');
-        if (el) { el.classList.remove('hidden'); el.classList.add('flex'); }
-        let tab = document.getElementById('tab-registo');
-        if (tab) tab.className = "px-1 py-1 font-semibold text-emerald-400 border-b-2 border-emerald-400 transition truncate";
-        let nav = document.getElementById('nav-btn-registo');
-        if (nav) nav.className = "flex flex-col items-center text-emerald-400";
-    } else if (aba === 'historico') {
-        let el = document.getElementById('secao-historico');
-        if (el) { el.classList.remove('hidden'); el.classList.add('flex'); }
-        let tab = document.getElementById('tab-historico');
-        if (tab) tab.className = "px-1 py-1 font-semibold text-emerald-400 border-b-2 border-emerald-400 transition truncate";
-        let nav = document.getElementById('nav-btn-historico');
-        if (nav) nav.className = "flex flex-col items-center text-emerald-400";
-        atualizarListaHistoricoCompleto();
-    } else if (aba === 'extrato') {
-        let el = document.getElementById('secao-extrato');
-        if (el) { el.classList.remove('hidden'); el.classList.add('flex'); }
-        let tab = document.getElementById('tab-extrato');
-        if (tab) tab.className = "px-1 py-1 font-semibold text-emerald-400 border-b-2 border-emerald-400 transition truncate";
-        let nav = document.getElementById('nav-btn-extrato');
-        if (nav) nav.className = "flex flex-col items-center text-emerald-400";
-        preencherAnosFiltro();
-        atualizarExtrato();
-    } else if (aba === 'graficos') {
-        let el = document.getElementById('secao-graficos');
-        if (el) { el.classList.remove('hidden'); el.classList.add('flex'); }
-        let tab = document.getElementById('tab-graficos');
-        if (tab) tab.className = "px-1 py-1 font-semibold text-emerald-400 border-b-2 border-emerald-400 transition truncate";
-        let nav = document.getElementById('nav-btn-graficos');
-        if (nav) nav.className = "flex flex-col items-center text-emerald-400";
-        atualizarGraficoLinhas();
+    if (editIndex > -1) {
+        dadosApp.apostas[editIndex] = apostaObj;
+        document.getElementById('edit-index').value = -1;
+        document.getElementById('form-title').innerHTML = '<i class="fa-solid fa-plus-circle"></i> Registar Nova Aposta';
+        document.getElementById('btn-salvar').innerText = 'Concluir e Registar';
+    } else {
+        dadosApp.apostas.push(apostaObj);
+    }
+
+    guardarDadosLocais();
+    limparFormularioAposta();
+    renderizarTudo();
+    alert('Aposta guardada com sucesso!');
+}
+
+function limparFormularioAposta() {
+    document.getElementById('equipa-a').value = '';
+    document.getElementById('equipa-b').value = '';
+    document.getElementById('valor-aposta').value = '';
+    document.getElementById('odd-aposta').value = '';
+    preencherDataAtual();
+}
+
+function editarAposta(index) {
+    const a = dadosApp.apostas[index];
+    if (!a) return;
+    document.getElementById('modalidade-aposta').value = a.modalidade;
+    document.getElementById('estado-aposta').value = a.estado;
+    document.getElementById('equipa-a').value = a.equipaA;
+    document.getElementById('equipa-b').value = a.equipaB;
+    document.getElementById('valor-aposta').value = a.valor;
+    document.getElementById('odd-aposta').value = a.odd;
+    document.getElementById('data-aposta').value = a.data;
+    document.getElementById('edit-index').value = index;
+    
+    document.getElementById('form-title').innerHTML = '<i class="fa-solid fa-pen"></i> Editar Aposta';
+    document.getElementById('btn-salvar').innerText = 'Atualizar Aposta';
+    mudarAba('registo');
+}
+
+function apagarAposta(index) {
+    if (confirm('Tem a certeza que pretende apagar esta aposta?')) {
+        dadosApp.apostas.splice(index, 1);
+        guardarDadosLocais();
+        renderizarTudo();
     }
 }
 
-function alternarFormularioRegisto(tipo) {
-    const tipos = ['aposta', 'raspadinha', 'transacao'];
-    tipos.forEach(t => {
-        let form = document.getElementById(`form-${t}`);
-        let btn = document.getElementById(`btn-tipo-${t}`);
-        if (form) form.classList.add('hidden');
-        if (btn) {
-            btn.classList.remove('bg-emerald-500/20', 'text-emerald-400', 'border-emerald-500/50');
-            btn.classList.add('bg-slate-800', 'text-slate-400', 'border-slate-700');
-        }
+// -----------------------------------------
+// GESTÃO DE RASPADINHAS
+// -----------------------------------------
+function toggleValorPremio() {
+    const estado = document.getElementById('raspadinha-estado').value;
+    const container = document.getElementById('container-premio');
+    if (estado === 'Premiado') {
+        container.classList.remove('hidden');
+    } else {
+        container.classList.add('hidden');
+    }
+}
+
+function guardarRaspadinha() {
+    const nome = document.getElementById('raspadinha-nome').value.trim();
+    const custo = parseFloat(document.getElementById('raspadinha-custo').value);
+    const estado = document.getElementById('raspadinha-estado').value;
+    const premio = estado === 'Premiado' ? (parseFloat(document.getElementById('raspadinha-premio').value) || 0) : 0;
+    const data = document.getElementById('raspadinha-data').value || new Date().toISOString().split('T')[0];
+
+    if (!nome || isNaN(custo) || custo <= 0) {
+        alert('Por favor, insira o nome e um custo válido para a raspadinha.');
+        return;
+    }
+
+    dadosApp.raspadinhas.push({
+        tipo: 'raspadinha',
+        nome,
+        custo,
+        estado,
+        premio,
+        data
     });
 
-    let ativoForm = document.getElementById(`form-${tipo}`);
-    let ativoBtn = document.getElementById(`btn-tipo-${tipo}`);
-    if (ativoForm) ativoForm.classList.remove('hidden');
-    if (ativoBtn) {
-        ativoBtn.classList.remove('bg-slate-800', 'text-slate-400', 'border-slate-700');
-        ativoBtn.classList.add('bg-emerald-500/20', 'text-emerald-400', 'border-emerald-500/50');
+    guardarDadosLocais();
+    document.getElementById('raspadinha-nome').value = '';
+    document.getElementById('raspadinha-custo').value = '';
+    document.getElementById('raspadinha-premio').value = '';
+    document.getElementById('raspadinha-estado').value = 'Perdido';
+    toggleValorPremio();
+    preencherDataAtual();
+    renderizarTudo();
+    alert('Raspadinha registada com sucesso!');
+}
+
+function apagarRaspadinha(index) {
+    if (confirm('Pretende apagar o registo desta raspadinha?')) {
+        dadosApp.raspadinhas.splice(index, 1);
+        guardarDadosLocais();
+        renderizarTudo();
     }
+}
+
+// -----------------------------------------
+// RENDERIZAÇÃO E CÁLCULOS GLOBAIS
+// -----------------------------------------
+function renderizarTudo() {
+    calcularBancaTotal();
+    renderizarRecentes();
+    renderizarRaspadinhasRecentes();
+    renderizarHistoricoCompleto();
+    povoarAnosFiltro();
+    atualizarExtrato();
+    atualizarGraficoLinhas();
 }
 
 function calcularBancaTotal() {
-    let bancaCalculada = bancaInicial;
-    
-    dadosApp.apostas.forEach(aposta => {
-        if (aposta.estado === "Venceu") {
-            bancaCalculada += (aposta.valor * aposta.odd) - aposta.valor;
-        } else if (aposta.estado === "Perdeu") {
-            bancaCalculada -= aposta.valor;
+    let banca = dadosApp.saldoInicial;
+
+    dadosApp.apostas.forEach(a => {
+        if (a.estado === 'Venceu') {
+            banca += (a.valor * a.odd) - a.valor;
+        } else if (a.estado === 'Perdeu') {
+            banca -= a.valor;
         }
     });
 
     dadosApp.raspadinhas.forEach(r => {
-        bancaCalculada += (r.premio - r.custo);
+        banca -= r.custo;
+        if (r.estado === 'Premiado') {
+            banca += r.premio;
+        }
     });
 
-    dadosApp.transacoes.forEach(t => {
-        if (t.tipo === "Depósito") bancaCalculada += t.valor;
-        else if (t.tipo === "Levantamento") bancaCalculada -= t.valor;
+    dadosApp.movimentosCaixa.forEach(m => {
+        if (m.subtipo === 'deposito') banca += m.valor;
+        if (m.subtipo === 'levantamento') banca -= m.valor;
     });
 
-    return bancaCalculada;
-}
-
-function gerarHtmlApostaCard(aposta, originalIndex) {
-    let badgeClass = "bg-amber-500/20 text-amber-400 border-amber-500/30";
-    let valorGanhoPerdidoStr = "---";
-
-    if (aposta.estado === "Venceu") {
-        badgeClass = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
-        let lucro = (aposta.valor * aposta.odd) - aposta.valor;
-        valorGanhoPerdidoStr = `<span class="text-emerald-400 font-bold">+${lucro.toFixed(2)} €</span>`;
-    } else if (aposta.estado === "Perdeu") {
-        badgeClass = "bg-rose-500/20 text-rose-400 border-rose-500/30";
-        valorGanhoPerdidoStr = `<span class="text-rose-400 font-bold">-${aposta.valor.toFixed(2)} €</span>`;
+    const elBanca = document.getElementById('banca-atual');
+    if (elBanca) {
+        elBanca.innerText = `${banca.toFixed(2)} €`;
     }
-
-    return `
-        <div class="bg-slate-800 border border-slate-700/60 p-2.5 rounded-xl flex justify-between items-center shrink-0">
-            <div>
-                <div class="flex items-center gap-1.5">
-                    <span class="text-[9px] bg-slate-700 px-1 py-0.5 rounded text-slate-300 font-medium">${aposta.modalidade}</span>
-                    <span class="text-xs font-bold text-white">${aposta.equipaA} vs ${aposta.equipaB}</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded-full border ${badgeClass}">${aposta.estado}</span>
-                </div>
-                <div class="text-[10px] text-slate-400 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-                    <span>Data: ${aposta.data}</span>
-                    <span>Aposta: <b>${aposta.valor.toFixed(2)} €</b></span>
-                    <span>ODD: <b>${aposta.odd.toFixed(2)}</b></span>
-                    <span>Resultado: <b>${valorGanhoPerdidoStr}</b></span>
-                </div>
-            </div>
-            <div class="flex gap-1">
-                <button onclick="editarAposta(${originalIndex})" class="bg-slate-700 hover:bg-slate-600 text-slate-200 p-1.5 rounded-lg text-xs" title="Editar"><i class="fa-solid fa-pen"></i></button>
-                <button onclick="apagarAposta(${originalIndex})" class="bg-rose-500/20 hover:bg-rose-500/40 text-rose-400 p-1.5 rounded-lg text-xs" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
-            </div>
-        </div>
-    `;
 }
 
-function gerarHtmlRaspadinhaCard(r, originalIndex) {
-    let saldo = r.premio - r.custo;
-    let badgeClass = saldo > 0 ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : (saldo < 0 ? "bg-rose-500/20 text-rose-400 border-rose-500/30" : "bg-amber-500/20 text-amber-400 border-amber-500/30");
-    let saldoStr = saldo > 0 ? `+${saldo.toFixed(2)} €` : `${saldo.toFixed(2)} €`;
+function renderizarRecentes() {
+    const container = document.getElementById('lista-recentes');
+    const contador = document.getElementById('contador-recentes');
+    if (!container) return;
 
-    return `
-        <div class="bg-slate-800 border border-slate-700/60 p-2.5 rounded-xl flex justify-between items-center shrink-0">
-            <div>
-                <div class="flex items-center gap-1.5">
-                    <span class="text-[9px] bg-indigo-500/20 text-indigo-300 px-1 py-0.5 rounded font-medium">Raspadinha</span>
-                    <span class="text-xs font-bold text-white">${r.nome}</span>
-                    <span class="text-[9px] px-1.5 py-0.5 rounded-full border ${badgeClass}">${saldo >= 0 ? 'Lucro' : 'Prejuízo'}</span>
-                </div>
-                <div class="text-[10px] text-slate-400 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-                    <span>Data: ${r.data}</span>
-                    <span>Custo: <b>${r.custo.toFixed(2)} €</b></span>
-                    <span>Prémio: <b>${r.premio.toFixed(2)} €</b></span>
-                    <span>Balanço: <b class="${saldo >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${saldoStr}</b></span>
-                </div>
-            </div>
-            <div class="flex gap-1">
-                <button onclick="apagarRaspadinha(${originalIndex})" class="bg-rose-500/20 hover:bg-rose-500/40 text-rose-400 p-1.5 rounded-lg text-xs" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
-            </div>
-        </div>
-    `;
-}
+    container.innerHTML = '';
+    const hoje = new Date();
+    const seteDiasAtras = new Date();
+    seteDiasAtras.setDate(hoje.getDate() - 7);
 
-function atualizarInterface() {
-    let bancaCalculada = calcularBancaTotal();
-    
-    let apostasComIndex = dadosApp.apostas.map((a, idx) => ({ ...a, originalIndex: idx, tipoItem: 'aposta' }));
-    let raspadinhaComIndex = dadosApp.raspadinhas.map((r, idx) => ({ ...r, originalIndex: idx, tipoItem: 'raspadinha' }));
-    
-    let todosItens = [...apostasComIndex, ...raspadinhaComIndex];
-    todosItens.sort((a, b) => new Date(b.data) - new Date(a.data));
+    const recentes = dadosApp.apostas.map((a, index) => ({ ...a, originalIndex: index }))
+        .filter(a => new Date(a.data) >= seteDiasAtras)
+        .sort((a, b) => new Date(b.data) - new Date(a.data));
 
-    let hoje = new Date();
-    let limiteDias = new Date();
-    limiteDias.setDate(hoje.getDate() - 7);
-    let recentes = todosItens.filter(item => new Date(item.data) >= limiteDias);
+    if (contador) contador.innerText = `${recentes.length} registos`;
 
-    let htmlRecentes = "";
     if (recentes.length === 0) {
-        htmlRecentes = `<div class="text-center py-4 text-slate-500 text-xs italic">Ainda não existem registos nos últimos 7 dias.</div>`;
-    } else {
-        recentes.forEach(item => {
-            if (item.tipoItem === 'aposta') {
-                htmlRecentes += gerarHtmlApostaCard(item, item.originalIndex);
-            } else {
-                htmlRecentes += gerarHtmlRaspadinhaCard(item, item.originalIndex);
-            }
-        });
+        container.innerHTML = '<div class="text-center py-4 text-slate-500 text-xs italic">Sem apostas recentes nos últimos 7 dias.</div>';
+        return;
     }
 
-    let elBanca = document.getElementById("banca-atual");
-    let elRecentes = document.getElementById("lista-recentes");
-    let elContador = document.getElementById("contador-recentes");
+    recentes.forEach(a => {
+        let corEstado = 'bg-amber-500/20 text-amber-300';
+        let textoRes = 'Pendente';
+        if (a.estado === 'Venceu') {
+            corEstado = 'bg-emerald-500/20 text-emerald-300';
+            textoRes = `+${(a.valor * a.odd - a.valor).toFixed(2)} €`;
+        } else if (a.estado === 'Perdeu') {
+            corEstado = 'bg-rose-500/20 text-rose-300';
+            textoRes = `-${a.valor.toFixed(2)} €`;
+        }
 
-    if (elBanca) elBanca.innerText = bancaCalculada.toFixed(2) + " €";
-    if (elRecentes) elRecentes.innerHTML = htmlRecentes;
-    if (elContador) elContador.innerText = recentes.length + (recentes.length === 1 ? " registo" : " registos");
+        const card = document.createElement('div');
+        card.className = 'bg-slate-900 border border-slate-700/60 p-2.5 rounded-xl flex justify-between items-center text-xs';
+        card.innerHTML = `
+            <div>
+                <div class="flex items-center gap-1.5 mb-0.5">
+                    <span class="text-[9px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">${a.modalidade}</span>
+                    <span class="font-semibold text-white">${a.equipaA} vs ${a.equipaB}</span>
+                </div>
+                <p class="text-[10px] text-slate-400">Data: ${a.data} | Aposta: ${a.valor.toFixed(2)} € | ODD: ${a.odd}</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${corEstado}">${textoRes}</span>
+                <button onclick="editarAposta(${a.originalIndex})" class="text-slate-400 hover:text-emerald-400 p-1"><i class="fa-solid fa-pen"></i></button>
+                <button onclick="apagarAposta(${a.originalIndex})" class="text-slate-400 hover:text-rose-400 p-1"><i class="fa-solid fa-trash"></i></button>
+            </div>
+        `;
+        container.appendChild(card);
+    });
 }
 
-function atualizarListaHistoricoCompleto() {
-    let apostasComIndex = dadosApp.apostas.map((a, idx) => ({ ...a, originalIndex: idx, tipoItem: 'aposta' }));
-    let raspadinhaComIndex = dadosApp.raspadinhas.map((r, idx) => ({ ...r, originalIndex: idx, tipoItem: 'raspadinha' }));
+function renderizarRaspadinhasRecentes() {
+    const container = document.getElementById('lista-raspadinhas');
+    const contador = document.getElementById('contador-raspadinhas');
+    if (!container) return;
+
+    container.innerHTML = '';
+    const lista = dadosApp.raspadinhas.map((r, index) => ({ ...r, originalIndex: index }))
+        .sort((a, b) => new Date(b.data) - new Date(a.data));
+
+    if (contador) contador.innerText = `${lista.length} registos`;
+
+    if (lista.length === 0) {
+        container.innerHTML = '<div class="text-center py-4 text-slate-500 text-xs italic">Sem registos de raspadinhas.</div>';
+        return;
+    }
+
+    lista.forEach(r => {
+        let corRes = r.estado === 'Premiado' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300';
+        let descRes = r.estado === 'Premiado' ? `Prémio: +${r.premio.toFixed(2)} €` : `Custo: -${r.custo.toFixed(2)} €`;
+
+        const card = document.createElement('div');
+        card.className = 'bg-slate-900 border border-slate-700/60 p-2.5 rounded-xl flex justify-between items-center text-xs';
+        card.innerHTML = `
+            <div>
+                <div class="flex items-center gap-1.5 mb-0.5">
+                    <span class="text-[9px] bg-slate-800 text-emerald-400 px-1.5 py-0.5 rounded">Raspadinha</span>
+                    <span class="font-semibold text-white">${r.nome}</span>
+                </div>
+                <p class="text-[10px] text-slate-400">Data: ${r.data} | Custo: ${r.custo.toFixed(2)} €</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${corRes}">${descRes}</span>
+                <button onclick="apagarRaspadinha(${r.originalIndex})" class="text-slate-400 hover:text-rose-400 p-1"><i class="fa-solid fa-trash"></i></button>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function renderizarHistoricoCompleto() {
+    const container = document.getElementById('lista-historico-completo');
+    const contador = document.getElementById('contador-historico');
+    if (!container) return;
+
+    container.innerHTML = '';
     
-    let todosItens = [...apostasComIndex, ...raspadinhaComIndex];
-    todosItens.sort((a, b) => new Date(b.data) - new Date(a.data));
+    let todos = [
+        ...dadosApp.apostas.map((a, i) => ({ ...a, originType: 'aposta', originIndex: i })),
+        ...dadosApp.raspadinhas.map((r, i) => ({ ...r, originType: 'raspadinha', originIndex: i })),
+        ...dadosApp.movimentosCaixa.map((m, i) => ({ ...m, originType: 'caixa', originIndex: i }))
+    ].sort((a, b) => new Date(b.data) - new Date(a.data));
 
-    let htmlHistorico = "";
-    if (todosItens.length === 0) {
-        htmlHistorico = `<div class="text-center py-5 text-slate-500 text-xs italic">Ainda não existem registos.</div>`;
-    } else {
-        todosItens.forEach(item => {
-            if (item.tipoItem === 'aposta') {
-                htmlHistorico += gerarHtmlApostaCard(item, item.originalIndex);
-            } else {
-                htmlHistorico += gerarHtmlRaspadinhaCard(item, item.originalIndex);
-            }
-        });
+    if (contador) contador.innerText = `${todos.length} registos`;
+
+    if (todos.length === 0) {
+        container.innerHTML = '<div class="text-center py-5 text-slate-500 text-xs italic">Histórico vazio.</div>';
+        return;
     }
 
-    let elLista = document.getElementById("lista-historico-completo");
-    let elCont = document.getElementById("contador-historico");
-    if (elLista) elLista.innerHTML = htmlHistorico;
-    if (elCont) elCont.innerText = todosItens.length + (todosItens.length === 1 ? " registo" : " registos");
+    todos.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'bg-slate-900 border border-slate-700/60 p-2.5 rounded-xl flex justify-between items-center text-xs';
+        
+        if (item.originType === 'aposta') {
+            card.innerHTML = `
+                <div>
+                    <div class="flex items-center gap-1.5 mb-0.5">
+                        <span class="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded">Aposta (${item.modalidade})</span>
+                        <span class="font-semibold text-white">${item.equipaA} vs ${item.equipaB}</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400">${item.data} | Valor: ${item.valor.toFixed(2)} € | ODD: ${item.odd} | Estado: <span class="text-slate-200">${item.estado}</span></p>
+                </div>
+                <button onclick="apagarAposta(${item.originIndex})" class="text-slate-400 hover:text-rose-400 p-1"><i class="fa-solid fa-trash"></i></button>
+            `;
+        } else if (item.originType === 'raspadinha') {
+            card.innerHTML = `
+                <div>
+                    <div class="flex items-center gap-1.5 mb-0.5">
+                        <span class="text-[9px] bg-teal-500/20 text-teal-300 px-1.5 py-0.5 rounded">Raspadinha</span>
+                        <span class="font-semibold text-white">${item.nome}</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400">${item.data} | Custo: ${item.custo.toFixed(2)} € | Estado: <span class="text-slate-200">${item.estado}</span> ${item.estado === 'Premiado' ? `(Prémio: ${item.premio.toFixed(2)}€)` : ''}</p>
+                </div>
+                <button onclick="apagarRaspadinha(${item.originIndex})" class="text-slate-400 hover:text-rose-400 p-1"><i class="fa-solid fa-trash"></i></button>
+            `;
+        } else {
+            const isDep = item.subtipo === 'deposito';
+            card.innerHTML = `
+                <div>
+                    <div class="flex items-center gap-1.5 mb-0.5">
+                        <span class="text-[9px] ${isDep ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'} px-1.5 py-0.5 rounded uppercase">${item.subtipo}</span>
+                        <span class="font-semibold text-white">Movimento de Caixa</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400">${item.data} | Valor: <span class="${isDep ? 'text-emerald-400' : 'text-rose-400'} font-bold">${isDep ? '+' : '-'}${item.valor.toFixed(2)} €</span></p>
+                </div>
+                <button onclick="apagarMovimentoCaixa(${item.originIndex})" class="text-slate-400 hover:text-rose-400 p-1"><i class="fa-solid fa-trash"></i></button>
+            `;
+        }
+        container.appendChild(card);
+    });
 }
 
-function preencherAnosFiltro() {
-    let anos = new Set();
-    dadosApp.apostas.forEach(a => { if (a.data) anos.add(a.data.split('-')[0]); });
-    dadosApp.raspadinhas.forEach(r => { if (r.data) anos.add(r.data.split('-')[0]); });
-    dadosApp.transacoes.forEach(t => { if (t.data) anos.add(t.data.split('-')[0]); });
-
-    let selectAno = document.getElementById('filtro-ano');
+// -----------------------------------------
+// EXTRATO E FILTROS TEMPORAIS
+// -----------------------------------------
+function povoarAnosFiltro() {
+    const selectAno = document.getElementById('filtro-ano');
     if (!selectAno) return;
-    let anoAtualSel = selectAno.value;
-    let html = '<option value="todos">Todos</option>';
-    anos.forEach(ano => {
-        html += `<option value="${ano}">${ano}</option>`;
-    });
-    selectAno.innerHTML = html;
-    selectAno.value = anos.has(anoAtualSel) ? anoAtualSel : 'todos';
-}
-
-function obterSemanaDoMes(dataStr) {
-    let dia = parseInt(dataStr.split('-')[2]);
-    if (dia <= 7) return 1;
-    if (dia <= 14) return 2;
-    if (dia <= 21) return 3;
-    return 4;
-}
-
-function obterDadosExtratoFiltrados() {
-    let filtroAno = document.getElementById('filtro-ano') ? document.getElementById('filtro-ano').value : 'todos';
-    let filtroMes = document.getElementById('filtro-mes') ? document.getElementById('filtro-mes').value : 'todos';
-    let filtroSemana = document.getElementById('filtro-semana') ? document.getElementById('filtro-semana').value : 'todas';
-
-    let saldoAcumuladoGlobal = bancaInicial;
-    let saldoAnualCalc = 0;
-    let saldoMensalCalc = 0;
-    let saldoSemanalCalc = 0;
-
-    let movimentosFiltrados = [];
     
-    let todosEventos = [];
-    dadosApp.apostas.forEach(a => { if (a.estado !== "Pendente") todosEventos.push({ ...a, origem: 'aposta' }); });
-    dadosApp.raspadinhas.forEach(r => todosEventos.push({ ...r, origem: 'raspadinha' }));
-    dadosApp.transacoes.forEach(t => todosEventos.push({ ...t, origem: 'transacao' }));
+    let anosSet = new Set();
+    dadosApp.apostas.forEach(a => { if (a.data) anosSet.add(a.data.split('-')[0]); });
+    dadosApp.raspadinhas.forEach(r => { if (r.data) anosSet.add(r.data.split('-')[0]); });
+    dadosApp.movimentosCaixa.forEach(m => { if (m.data) anosSet.add(m.data.split('-')[0]); });
 
-    todosEventos.sort((a, b) => new Date(a.data) - new Date(b.data));
+    const anoAtual = new Date().getFullYear().toString();
+    anosSet.add(anoAtual);
 
-    todosEventos.forEach((item) => {
-        let [ano, mes, dia] = item.data.split('-');
-        let semana = obterSemanaDoMes(item.data);
-
-        let impacto = 0;
-        let creditoNum = 0;
-        let debitoNum = 0;
-        let descricao = "";
-
-        if (item.origem === 'aposta') {
-            descricao = `Aposta: ${item.modalidade} (${item.equipaA} vs ${item.equipaB})`;
-            if (item.estado === "Venceu") {
-                let lucro = (item.valor * item.odd) - item.valor;
-                impacto = lucro;
-                creditoNum = lucro;
-            } else if (item.estado === "Perdeu") {
-                impacto = -item.valor;
-                debitoNum = item.valor;
-            }
-        } else if (item.origem === 'raspadinha') {
-            descricao = `Raspadinha: ${item.nome}`;
-            let balanco = item.premio - item.custo;
-            impacto = balanco;
-            if (balanco >= 0) creditoNum = balanco;
-            else debitoNum = Math.abs(balanco);
-        } else if (item.origem === 'transacao') {
-            descricao = `Transação: ${item.tipo}`;
-            if (item.tipo === "Depósito") {
-                impacto = item.valor;
-                creditoNum = item.valor;
-            } else {
-                impacto = -item.valor;
-                debitoNum = item.valor;
-            }
-        }
-
-        saldoAcumuladoGlobal += impacto;
-
-        let matchAno = (filtroAno === 'todos' || ano === filtroAno);
-        let matchMes = matchAno && (filtroMes === 'todos' || parseInt(mes) === parseInt(filtroMes));
-        let matchSemana = matchMes && (filtroSemana === 'todas' || semana === parseInt(filtroSemana));
-
-        if (matchAno) saldoAnualCalc += impacto;
-        if (matchMes) saldoMensalCalc += impacto;
-        if (matchSemana) saldoSemanalCalc += impacto;
-
-        if (matchAno && matchMes && matchSemana) {
-            movimentosFiltrados.push({
-                data: item.data,
-                descricao: descricao,
-                debito: debitoNum,
-                credito: creditoNum,
-                acumulado: saldoAcumuladoGlobal
-            });
-        }
+    const valorSelecionado = selectAno.value;
+    selectAno.innerHTML = '<option value="todos">Todos</option>';
+    Array.from(anosSet).sort().reverse().forEach(ano => {
+        const opt = document.createElement('option');
+        opt.value = ano;
+        opt.innerText = ano;
+        selectAno.appendChild(opt);
     });
-
-    return {
-        movimentos: movimentosFiltrados,
-        saldoAnual: saldoAnualCalc,
-        saldoMensal: saldoMensalCalc,
-        saldoSemanal: saldoSemanalCalc
-    };
+    selectAno.value = anosSet.has(valorSelecionado) ? valorSelecionado : 'todos';
 }
 
 function atualizarExtrato() {
-    let dados = obterDadosExtratoFiltrados();
-    let htmlExtrato = `
-        <tr class="border-b border-slate-800 bg-slate-900/40">
-            <td class="py-1 px-1 text-slate-300 font-medium">Banca Inicial Configurada</td>
-            <td class="py-1 px-1 text-slate-500">-</td>
-            <td class="py-1 px-1 text-emerald-400">+${bancaInicial.toFixed(2)} €</td>
-            <td class="py-1 px-1 text-right font-bold text-white">${bancaInicial.toFixed(2)} €</td>
-        </tr>
-    `;
+    const tbody = document.getElementById('tabela-extrato');
+    const contadorExtrato = document.getElementById('extrato-contador');
+    if (!tbody) return;
 
-    dados.movimentos.forEach((m) => {
-        let creditoStr = m.credito > 0 ? `+${m.credito.toFixed(2)} €` : "-";
-        let debitoStr = m.debito > 0 ? `-${m.debito.toFixed(2)} €` : "-";
-        let corTextoAcumulado = m.acumulado >= bancaInicial ? 'text-emerald-400' : 'text-rose-400';
+    const filtroAno = document.getElementById('filtro-ano').value;
+    const filtroMes = document.getElementById('filtro-mes').value;
+    const filtroSemana = document.getElementById('filtro-semana').value;
 
-        htmlExtrato += `
-            <tr class="border-b border-slate-800">
-                <td class="py-1 px-1"><b>${m.data}</b><br><span class="text-[8px] text-slate-400">${m.descricao}</span></td>
-                <td class="py-1 px-1 text-rose-400">${debitoStr}</td>
-                <td class="py-1 px-1 text-emerald-400">${creditoStr}</td>
-                <td class="py-1 px-1 text-right font-bold ${corTextoAcumulado}">${m.acumulado.toFixed(2)} €</td>
-            </tr>
-        `;
+    let transacoes = [];
+
+    dadosApp.apostas.forEach(a => {
+        if (a.estado === 'Perdido') {
+            transacoes.push({ data: a.data, desc: `Aposta Perdida: ${a.equipaA} vs ${a.equipaB}`, debito: a.valor, credito: 0 });
+        } else if (a.estado === 'Venceu') {
+            transacoes.push({ data: a.data, desc: `Aposta Vencida: ${a.equipaA} vs ${a.equipaB}`, debito: 0, credito: (a.valor * a.odd) - a.valor });
+        }
     });
 
-    if (document.getElementById("tabela-extrato")) document.getElementById("tabela-extrato").innerHTML = htmlExtrato;
-    if (document.getElementById("extrato-contador")) document.getElementById("extrato-contador").innerText = dados.movimentos.length + (dados.movimentos.length === 1 ? " movimento" : " movimentos");
+    dadosApp.raspadinhas.forEach(r => {
+        transacoes.push({ data: r.data, desc: `Raspadinha: ${r.nome} (Custo)`, debito: r.custo, credito: 0 });
+        if (r.estado === 'Premiado' && r.premio > 0) {
+            transacoes.push({ data: r.data, desc: `Prémio Raspadinha: ${r.nome}`, debito: 0, credito: r.premio });
+        }
+    });
 
-    let sAnual = document.getElementById("saldo-anual");
-    let sMensal = document.getElementById("saldo-mensal");
-    let sSemanal = document.getElementById("saldo-semanal");
+    dadosApp.movimentosCaixa.forEach(m => {
+        if (m.subtipo === 'deposito') {
+            transacoes.push({ data: m.data, desc: `Depósito de Capital`, debito: 0, credito: m.valor });
+        } else if (m.subtipo === 'levantamento') {
+            transacoes.push({ data: m.data, desc: `Levantamento de Capital`, debito: m.valor, credito: 0 });
+        }
+    });
 
-    if (sAnual) {
-        sAnual.innerText = (dados.saldoAnual >= 0 ? "+" : "") + dados.saldoAnual.toFixed(2) + " €";
-        sAnual.className = `text-xs font-bold mt-0.5 ${dados.saldoAnual >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+    transacoes.sort((a, b) => new Date(a.data) - new Date(b.data));
+
+    let filtradas = transacoes.filter(t => {
+        if (!t.data) return false;
+        const [ano, mes, dia] = t.data.split('-');
+        if (filtroAno !== 'todos' && ano !== filtroAno) return false;
+        if (filtroMes !== 'todos' && parseInt(mes) !== parseInt(filtroMes)) return false;
+        if (filtroSemana !== 'todas') {
+            const dNum = parseInt(dia);
+            const sem = dNum <= 7 ? 1 : dNum <= 14 ? 2 : dNum <= 21 ? 3 : 4;
+            if (sem !== parseInt(filtroSemana)) return false;
+        }
+        return true;
+    });
+
+    tbody.innerHTML = '';
+    let acumulado = dadosApp.saldoInicial;
+    let movimentosTotais = 0;
+
+    filtradas.forEach(t => {
+        movimentosTotais++;
+        acumulado += (t.credito - t.debito);
+
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-slate-700/50 hover:bg-slate-700/30';
+        tr.innerHTML = `
+            <td class="py-2 px-1">
+                <div class="font-medium text-white">${t.desc}</div>
+                <div class="text-[9px] text-slate-400">${t.data}</div>
+            </td>
+            <td class="py-2 px-1 text-rose-400 font-semibold">${t.debito > 0 ? `-${t.debito.toFixed(2)} €` : '-'}</td>
+            <td class="py-2 px-1 text-emerald-400 font-semibold">${t.credito > 0 ? `+${t.credito.toFixed(2)} €` : '-'}</td>
+            <td class="py-2 px-1 text-right font-bold text-slate-200">${acumulado.toFixed(2)} €</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    if (contadorExtrato) contadorExtrato.innerText = `${movimentosTotais} movimentos`;
+
+    atualizarSaldosTemporais(transacoes);
+}
+
+function atualizarSaldosTemporais(transacoes) {
+    const hoje = new Date();
+    const anoAtual = hoje.getFullYear().toString();
+    const mesAtual = hoje.getMonth() + 1;
+
+    let saldoAnual = 0;
+    let saldoMensal = 0;
+    let saldoSemanal = 0;
+
+    const seteDiasAtras = new Date();
+    seteDiasAtras.setDate(hoje.getDate() - 7);
+
+    transacoes.forEach(t => {
+        if (!t.data) return;
+        const [ano, mes, dia] = t.data.split('-');
+        const tDate = new Date(t.data);
+        const diff = t.credito - t.debito;
+
+        if (ano === anoAtual) {
+            saldoAnual += diff;
+            if (parseInt(mes) === mesAtual) {
+                saldoMensal += diff;
+            }
+        }
+        if (tDate >= seteDiasAtras) {
+            saldoSemanal += diff;
+        }
+    });
+
+    const elAnual = document.getElementById('saldo-anual');
+    const elMensal = document.getElementById('saldo-mensal');
+    const elSemanal = document.getElementById('saldo-semanal');
+
+    if (elAnual) {
+        elAnual.innerText = `${saldoAnual >= 0 ? '+' : ''}${saldoAnual.toFixed(2)} €`;
+        elAnual.className = `text-xs font-bold mt-0.5 ${saldoAnual >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
     }
-    if (sMensal) {
-        sMensal.innerText = (dados.saldoMensal >= 0 ? "+" : "") + dados.saldoMensal.toFixed(2) + " €";
-        sMensal.className = `text-xs font-bold mt-0.5 ${dados.saldoMensal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+    if (elMensal) {
+        elMensal.innerText = `${saldoMensal >= 0 ? '+' : ''}${saldoMensal.toFixed(2)} €`;
+        elMensal.className = `text-xs font-bold mt-0.5 ${saldoMensal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
     }
-    if (sSemanal) {
-        sSemanal.innerText = (dados.saldoSemanal >= 0 ? "+" : "") + dados.saldoSemanal.toFixed(2) + " €";
-        sSemanal.className = `text-xs font-bold mt-0.5 ${dados.saldoSemanal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+    if (elSemanal) {
+        elSemanal.innerText = `${saldoSemanal >= 0 ? '+' : ''}${saldoSemanal.toFixed(2)} €`;
+        elSemanal.className = `text-xs font-bold mt-0.5 ${saldoSemanal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
     }
 }
 
 function gerarPdfExtrato() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-
-    let dados = obterDadosExtratoFiltrados();
-    let filtroAno = document.getElementById('filtro-ano').value;
-    let filtroMes = document.getElementById('filtro-mes').value;
-    let filtroSemana = document.getElementById('filtro-semana').value;
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.setTextColor(16, 185, 129);
-    doc.text("Apostas do Zé - Extrato de Conta", 14, 20);
-
-    doc.setFont("helvetica", "normal");
+    doc.text("Extrato - Apostas do Zé", 14, 20);
     doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Data de Emissão: ${new Date().toLocaleDateString('pt-PT')}`, 14, 26);
-    doc.text(`Filtros Aplicados -> Ano: ${filtroAno} | Mês: ${filtroMes} | Semana: ${filtroSemana}`, 14, 32);
+    doc.text(`Saldo Inicial Base: ${dadosApp.saldoInicial.toFixed(2)} EUR`, 14, 28);
+    
+    let y = 38;
+    doc.text("Data | Descrição | Débito | Crédito", 14, y);
+    doc.line(14, y + 2, 196, y + 2);
+    
+    let acumulado = dadosApp.saldoInicial;
+    let transacoes = [];
 
-    doc.setFillColor(241, 245, 249);
-    doc.roundedRect(14, 38, 182, 18, 2, 2, 'F');
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(30, 41, 59);
-    doc.text(`Saldo Anual: ${dados.saldoAnual >= 0 ? '+' : ''}${dados.saldoAnual.toFixed(2)} EUR`, 18, 49);
-    doc.text(`Saldo Mensal: ${dados.saldoMensal >= 0 ? '+' : ''}${dados.saldoMensal.toFixed(2)} EUR`, 78, 49);
-    doc.text(`Saldo Semanal: ${dados.saldoSemanal >= 0 ? '+' : ''}${dados.saldoSemanal.toFixed(2)} EUR`, 138, 49);
+    dadosApp.apostas.forEach(a => {
+        if (a.estado === 'Perdido') transacoes.push({ data: a.data, desc: `Aposta Perdida: ${a.equipaA} vs ${a.equipaB}`, debito: a.valor, credito: 0 });
+        if (a.estado === 'Venceu') transacoes.push({ data: a.data, desc: `Aposta Vencida: ${a.equipaA} vs ${a.equipaB}`, debito: 0, credito: (a.valor * a.odd) - a.valor });
+    });
+    dadosApp.raspadinhas.forEach(r => {
+        transacoes.push({ data: r.data, desc: `Raspadinha: ${r.nome}`, debito: r.custo, credito: 0 });
+        if (r.estado === 'Premiado') transacoes.push({ data: r.data, desc: `Prémio Raspadinha: ${r.nome}`, debito: 0, credito: r.premio });
+    });
+    dadosApp.movimentosCaixa.forEach(m => {
+        if (m.subtipo === 'deposito') transacoes.push({ data: m.data, desc: `Depósito de Capital`, debito: 0, credito: m.valor });
+        if (m.subtipo === 'levantamento') transacoes.push({ data: m.data, desc: `Levantamento de Capital`, debito: m.valor, credito: 0 });
+    });
+    
+    transacoes.sort((a, b) => new Date(a.data) - new Date(b.data));
 
-    let y = 65;
-    doc.setFontSize(11);
-    doc.text("Movimentos Detalhados", 14, y);
-    y += 6;
-
-    doc.setFillColor(30, 41, 59);
-    doc.rect(14, y, 182, 8, 'F');
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(255, 255, 255);
-    doc.text("Data / Descrição", 18, y + 5.5);
-    doc.text("Débito", 110, y + 5.5);
-    doc.text("Crédito", 138, y + 5.5);
-    doc.text("Acumulado", 175, y + 5.5, { align: "right" });
-
-    y += 8;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-
-    doc.setTextColor(50, 50, 50);
-    doc.text("Banca Inicial Configurada", 18, y + 5);
-    doc.text("-", 110, y + 5);
-    doc.text(`+${bancaInicial.toFixed(2)} €`, 138, y + 5);
-    doc.text(`${bancaInicial.toFixed(2)} €`, 190, y + 5, { align: "right" });
-    y += 8;
-
-    dados.movimentos.forEach((m, idx) => {
-        if (y > 275) {
-            doc.addPage();
-            y = 20;
-        }
-
-        if (idx % 2 === 0) {
-            doc.setFillColor(248, 250, 252);
-            doc.rect(14, y - 2, 182, 8, 'F');
-        }
-
-        doc.setTextColor(30, 30, 30);
-        doc.text(`${m.data} - ${m.descricao}`, 18, y + 3);
-        
-        let debitoStr = m.debito > 0 ? `-${m.debito.toFixed(2)} €` : "-";
-        let creditoStr = m.credito > 0 ? `+${m.credito.toFixed(2)} €` : "-";
-
-        doc.text(debitoStr, 110, y + 3);
-        doc.text(creditoStr, 138, y + 3);
-        doc.text(`${m.acumulado.toFixed(2)} €`, 190, y + 3, { align: "right" });
-
+    transacoes.forEach(t => {
         y += 8;
+        if (y > 280) { doc.addPage(); y = 20; }
+        acumulado += (t.credito - t.debito);
+        doc.text(`${t.data} | ${t.desc} | -${t.debito.toFixed(2)} | +${t.credito.toFixed(2)}`, 14, y);
     });
 
-    doc.save(`extrato_apostas_${filtroAno}_${filtroMes}.pdf`);
+    doc.save("extrato-apostas-do-ze.pdf");
 }
 
+// -----------------------------------------
+// GRÁFICOS DE LINHAS DA BANCA
+// -----------------------------------------
 function atualizarGraficoLinhas() {
-    let container = document.getElementById("grafico-linhas-svg-container");
-    let labelsContainer = document.getElementById("grafico-eixo-x-labels");
-    if (!container || !labelsContainer) return;
+    const container = document.getElementById('grafico-linhas-svg-container');
+    const eixoX = document.getElementById('grafico-eixo-x-labels');
+    if (!container || !eixoX) return;
 
-    let dataInicioStr = document.getElementById('grafico-data-inicio').value;
-    let dataFimStr = document.getElementById('grafico-data-fim').value;
+    container.innerHTML = '';
+    eixoX.innerHTML = '';
 
-    if (!dataInicioStr || !dataFimStr) {
-        container.innerHTML = `<div class="w-full text-center text-slate-500 text-xs italic my-auto">Selecione o intervalo de datas.</div>`;
-        return;
-    }
+    let transacoes = [];
+    dadosApp.apostas.forEach(a => {
+        if (a.estado === 'Perdido') transacoes.push({ data: a.data, val: -a.valor });
+        if (a.estado === 'Venceu') transacoes.push({ data: a.data, val: (a.valor * a.odd) - a.valor });
+    });
+    dadosApp.raspadinhas.forEach(r => {
+        transacoes.push({ data: r.data, val: -r.custo });
+        if (r.estado === 'Premiado') transacoes.push({ data: r.data, val: r.premio });
+    });
+    dadosApp.movimentosCaixa.forEach(m => {
+        transacoes.push({ data: m.data, val: m.subtipo === 'deposito' ? m.valor : -m.valor });
+    });
 
-    let dInicio = new Date(dataInicioStr);
-    let dFim = new Date(dataFimStr);
+    transacoes.sort((a, b) => new Date(a.data) - new Date(b.data));
 
-    if (dInicio > dFim) {
-        container.innerHTML = `<div class="w-full text-center text-rose-400 text-xs italic my-auto">A data de início deve ser anterior à data de fim.</div>`;
-        return;
-    }
-
-    let saldoCorrente = bancaInicial;
+    let pontosPorDia = {};
+    let runningBanca = dadosApp.saldoInicial;
     
-    let todosEventos = [];
-    dadosApp.apostas.forEach(a => { if (a.estado !== "Pendente") todosEventos.push({ ...a, origem: 'aposta' }); });
-    dadosApp.raspadinhas.forEach(r => todosEventos.push({ ...r, origem: 'raspadinha' }));
-    dadosApp.transacoes.forEach(t => todosEventos.push({ ...t, origem: 'transacao' }));
+    pontosPorDia[transacoes.length > 0 ? transacoes[0].data : new Date().toISOString().split('T')[0]] = runningBanca;
+
+    transacoes.forEach(t => {
+        runningBanca += t.val;
+        pontosPorDia[t.data] = runningBanca;
+    });
+
+    const datas = Object.keys(pontosPorDia);
+    if (datas.length === 0) {
+        container.innerHTML = '<div class="w-full text-center text-slate-500 text-[10px] pb-4">Sem dados suficientes para gerar gráfico.</div>';
+        return;
+    }
+
+    const valores = Object.values(pontosPorDia);
+    const minVal = Math.min(...valores, dadosApp.saldoInicial) * 0.95;
+    const maxVal = Math.max(...valores, dadosApp.saldoInicial) * 1.05;
+    const amplitude = maxVal - minVal || 1;
+
+    let svgHTML = `<svg class="w-full h-full overflow-visible" viewBox="0 0 300 120" preserveAspectRatio="none">`;
     
-    todosEventos.sort((a, b) => new Date(a.data) - new Date(b.data));
+    const ySaldoInicial = 120 - ((dadosApp.saldoInicial - minVal) / amplitude) * 110;
+    svgHTML += `<line x1="0" y1="${ySaldoInicial}" x2="300" y2="${ySaldoInicial}" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.8"/>`;
 
-    todosEventos.forEach(item => {
-        if (item.data < dataInicioStr) {
-            if (item.origem === 'aposta') {
-                if (item.estado === "Venceu") saldoCorrente += (item.valor * item.odd) - item.valor;
-                else if (item.estado === "Perdeu") saldoCorrente -= item.valor;
-            } else if (item.origem === 'raspadinha') {
-                saldoCorrente += (item.premio - item.custo);
-            } else if (item.origem === 'transacao') {
-                if (item.tipo === "Depósito") saldoCorrente += item.valor;
-                else saldoCorrente -= item.valor;
-            }
+    let coords = [];
+    datas.forEach((d, i) => {
+        const x = (i / (datas.length - 1 || 1)) * 280 + 10;
+        const val = pontosPorDia[d];
+        const y = 120 - ((val - minVal) / amplitude) * 110;
+        coords.push({ x, y, val, data: d });
+    });
+
+    if (coords.length > 1) {
+        let pathD = `M ${coords[0].x} ${coords[0].y}`;
+        for (let i = 1; i < coords.length; i++) {
+            pathD += ` L ${coords[i].x} ${coords[i].y}`;
         }
+        svgHTML += `<path d="${pathD}" fill="none" stroke="#34d399" stroke-width="2.5" />`;
+    }
+
+    coords.forEach(c => {
+        svgHTML += `<circle cx="${c.x}" cy="${c.y}" r="3" fill="#10b981" stroke="#0f172a" stroke-width="1.5"/>`;
     });
 
-    let pontosGrafico = [];
-    let minBanca = bancaInicial;
-    let maxBanca = bancaInicial;
+    svgHTML += `</svg>`;
+    container.innerHTML = svgHTML;
 
-    let impactoPorData = {};
-    todosEventos.forEach(item => {
-        if (item.data >= dataInicioStr && item.data <= dataFimStr) {
-            let impacto = 0;
-            if (item.origem === 'aposta') {
-                if (item.estado === "Venceu") impacto = (item.valor * item.odd) - item.valor;
-                else if (item.estado === "Perdeu") impacto = -item.valor;
-            } else if (item.origem === 'raspadinha') {
-                impacto = item.premio - item.custo;
-            } else if (item.origem === 'transacao') {
-                impacto = item.tipo === "Depósito" ? item.valor : -item.valor;
-            }
-
-            if (!impactoPorData[item.data]) impactoPorData[item.data] = 0;
-            impactoPorData[item.data] += impacto;
-        }
-    });
-
-    let datasComMovimento = Object.keys(impactoPorData).sort();
-
-    if (datasComMovimento.length === 0) {
-        container.innerHTML = `<div class="w-full text-center text-slate-500 text-xs italic my-auto">Sem registos neste intervalo.</div>`;
-        labelsContainer.innerHTML = `<span>${dataInicioStr}</span><span>${dataFimStr}</span>`;
-        return;
-    }
-
-    datasComMovimento.forEach(dataStr => {
-        saldoCorrente += impactoPorData[dataStr];
-        pontosGrafico.push({ data: dataStr, saldo: saldoCorrente });
-        if (saldoCorrente < minBanca) minBanca = saldoCorrente;
-        if (saldoCorrente > maxBanca) maxBanca = saldoCorrente;
-    });
-
-    minBanca = Math.floor(minBanca / 5) * 5;
-    maxBanca = Math.ceil(maxBanca / 5) * 5;
-    if (minBanca === maxBanca) maxBanca += 5;
-
-    let spanBanca = maxBanca - minBanca;
-    let svgWidth = 360;
-    let svgHeight = 110;
-    let pontosSvg = "";
-    let passosX = pontosGrafico.length > 1 ? svgWidth / (pontosGrafico.length - 1) : svgWidth / 2;
-
-    pontosGrafico.forEach((item, index) => {
-        let x = pontosGrafico.length === 1 ? svgWidth / 2 : index * passosX;
-        let y = svgHeight - ((item.saldo - minBanca) / spanBanca) * (svgHeight - 16) - 8;
-        pontosSvg += `${x},${y} `;
-    });
-
-    let yPosBancaInicial = svgHeight - ((bancaInicial - minBanca) / spanBanca) * (svgHeight - 16) - 8;
-
-    let linhasGrelhaSvg = `
-        <line x1="0" y1="${yPosBancaInicial}" x2="${svgWidth}" y2="${yPosBancaInicial}" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="4,4" />
-    `;
-
-    for (let val = minBanca; val <= maxBanca; val += 5) {
-        if (val === bancaInicial) continue;
-        let yPos = svgHeight - ((val - minBanca) / spanBanca) * (svgHeight - 16) - 8;
-        linhasGrelhaSvg += `<line x1="0" y1="${yPos}" x2="${svgWidth}" y2="${yPos}" stroke="#334155" stroke-width="0.5" />`;
-    }
-
-    let diasSemanaNomes = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-    let htmlLabels = "";
-    if (pontosGrafico.length > 0) {
-        let primeiroDiaObj = new Date(pontosGrafico[0].data);
-        let ultimoDiaObj = new Date(pontosGrafico[pontosGrafico.length - 1].data);
-        let dSemanaInicio = diasSemanaNomes[primeiroDiaObj.getDay()];
-        let dSemanaFim = diasSemanaNomes[ultimoDiaObj.getDay()];
-        htmlLabels = `<span>${pontosGrafico[0].data.substring(5)} (${dSemanaInicio})</span><span>${pontosGrafico[pontosGrafico.length - 1].data.substring(5)} (${dSemanaFim})</span>`;
-    }
-
-    container.innerHTML = `
-        <svg viewBox="0 0 ${svgWidth} ${svgHeight}" class="w-full h-full overflow-visible">
-            ${linhasGrelhaSvg}
-            <polyline fill="none" stroke="#10b981" stroke-width="2.5" points="${pontosSvg}" stroke-linecap="round" stroke-linejoin="round" />
-            ${pontosGrafico.map((item, index) => {
-                let x = pontosGrafico.length === 1 ? svgWidth / 2 : index * passosX;
-                let y = svgHeight - ((item.saldo - minBanca) / spanBanca) * (svgHeight - 16) - 8;
-                let corPonto = item.saldo < bancaInicial ? '#f43f5e' : '#34d399';
-                let dObj = new Date(item.data);
-                let dSemana = diasSemanaNomes[dObj.getDay()];
-                return `<circle cx="${x}" cy="${y}" r="3.5" fill="${corPonto}" class="cursor-pointer">
-                    <title>${item.data} (${dSemana}): ${item.saldo.toFixed(2)}€ (Inicial: ${bancaInicial.toFixed(2)}€)</title>
-                </circle>`;
-            }).join('')}
-        </svg>
-    `;
-    labelsContainer.innerHTML = htmlLabels;
-}
-
-async function guardarAposta() {
-    let modalidade = document.getElementById("modalidade-aposta").value;
-    let equipaA = document.getElementById("equipa-a").value.trim();
-    let equipaB = document.getElementById("equipa-b").value.trim();
-    let valor = parseFloat(document.getElementById("valor-aposta").value);
-    let odd = parseFloat(document.getElementById("odd-aposta").value);
-    let estado = document.getElementById("estado-aposta").value;
-    let data = document.getElementById("data-aposta").value;
-    let editIndex = parseInt(document.getElementById("edit-index").value);
-
-    if (!equipaA || !equipaB || isNaN(valor) || isNaN(odd) || !data) {
-        alert("Por favor, preencha todos os campos corretamente.");
-        return;
-    }
-
-    if (editIndex === -1) {
-        dadosApp.apostas.push({ modalidade, equipaA, equipaB, valor, odd, estado, data });
-    } else {
-        dadosApp.apostas[editIndex] = { modalidade, equipaA, equipaB, valor, odd, estado, data };
-        document.getElementById("edit-index").value = "-1";
-        document.getElementById("form-title").innerHTML = `<i class="fa-solid fa-plus-circle"></i> Registar Novo Evento`;
-        document.getElementById("btn-salvar-aposta").innerText = "Concluir e Registar Aposta";
-    }
-
-    document.getElementById("equipa-a").value = "";
-    document.getElementById("equipa-b").value = "";
-    document.getElementById("valor-aposta").value = "";
-    document.getElementById("odd-aposta").value = "";
-    document.getElementById("estado-aposta").value = "Pendente";
-
-    await guardarDadosNoDrive();
-    atualizarInterface();
-}
-
-async function guardarRaspadinha() {
-    let nome = document.getElementById("nome-raspadinha").value.trim();
-    let custo = parseFloat(document.getElementById("custo-raspadinha").value);
-    let premio = parseFloat(document.getElementById("premio-raspadinha").value);
-    let data = document.getElementById("data-raspadinha").value;
-
-    if (!nome || isNaN(custo) || isNaN(premio) || !data) {
-        alert("Por favor, preencha todos os campos da raspadinha corretamente.");
-        return;
-    }
-
-    dadosApp.raspadinhas.push({ nome, custo, premio, data });
-
-    document.getElementById("nome-raspadinha").value = "";
-    document.getElementById("custo-raspadinha").value = "";
-    document.getElementById("premio-raspadinha").value = "";
-
-    await guardarDadosNoDrive();
-    atualizarInterface();
-}
-
-async function guardarTransacao() {
-    let tipo = document.getElementById("tipo-transacao").value;
-    let valor = parseFloat(document.getElementById("valor-transacao").value);
-    let data = document.getElementById("data-transacao").value;
-
-    if (isNaN(valor) || !data) {
-        alert("Por favor, preencha os dados da transação corretamente.");
-        return;
-    }
-
-    dadosApp.transacoes.push({ tipo, valor, data });
-
-    document.getElementById("valor-transacao").value = "";
-
-    await guardarDadosNoDrive();
-    atualizarInterface();
-}
-
-function editarAposta(index) {
-    let a = dadosApp.apostas[index];
-    alternarFormularioRegisto('aposta');
-    document.getElementById("modalidade-aposta").value = a.modalidade;
-    document.getElementById("equipa-a").value = a.equipaA;
-    document.getElementById("equipa-b").value = a.equipaB;
-    document.getElementById("valor-aposta").value = a.valor;
-    document.getElementById("odd-aposta").value = a.odd;
-    document.getElementById("estado-aposta").value = a.estado;
-    document.getElementById("data-aposta").value = a.data;
-    document.getElementById("edit-index").value = index;
-
-    document.getElementById("form-title").innerHTML = `<i class="fa-solid fa-pen-to-square"></i> A Editar Aposta #${index + 1}`;
-    document.getElementById("btn-salvar-aposta").innerText = "Atualizar Registo";
-    mudarAba('registo');
-}
-
-async function apagarAposta(index) {
-    if (confirm("Tem certeza que deseja apagar este registo de aposta?")) {
-        dadosApp.apostas.splice(index, 1);
-        await guardarDadosNoDrive();
-        atualizarInterface();
+    if (datas.length > 0) {
+        eixoX.innerHTML = `<span>${datas[0]}</span><span>${datas[datas.length - 1]}</span>`;
     }
 }
-
-async function apagarRaspadinha(index) {
-    if (confirm("Tem certeza que deseja apagar este registo de raspadinha?")) {
-        dadosApp.raspadinhas.splice(index, 1);
-        await guardarDadosNoDrive();
-        atualizarInterface();
-    }
-}
-
-function abrirConfigBanca() {
-    let novoValor = prompt("Introduza o valor inicial da Banca:", bancaInicial);
-    if (novoValor !== null && !isNaN(parseFloat(novoValor))) {
-        bancaInicial = parseFloat(novoValor);
-        guardarDadosNoDrive();
-        atualizarInterface();
-    }
-}
-
-let secReg = document.getElementById('secao-registo');
-if (secReg) secReg.classList.add('flex');
-carregarDadosDoDrive();
