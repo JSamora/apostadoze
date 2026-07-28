@@ -14,7 +14,7 @@ let dadosApp = {
 // Inicialização ao carregar a página
 document.addEventListener('DOMContentLoaded', () => {
     preencherDataAtual();
-    inicializarDatasMesAtual();
+    inicializarDatasPadrao();
     carregarDadosDoDrive();
 });
 
@@ -28,7 +28,7 @@ function preencherDataAtual() {
     if (elSub && !elSub.value) elSub.value = hoje;
 }
 
-function inicializarDatasMesAtual() {
+function inicializarDatasPadrao() {
     let hoje = new Date();
     let ano = hoje.getFullYear();
     let mes = String(hoje.getMonth() + 1).padStart(2, '0');
@@ -36,14 +36,21 @@ function inicializarDatasMesAtual() {
     let ultimoDiaObj = new Date(ano, hoje.getMonth() + 1, 0);
     let ultimoDia = `${ano}-${mes}-${String(ultimoDiaObj.getDate()).padStart(2, '0')}`;
 
-    const elInicio = document.getElementById('grafico-data-inicio');
-    const elFim = document.getElementById('grafico-data-fim');
-    if (elInicio && !elInicio.value) elInicio.value = primeiroDia;
-    if (elFim && !elFim.value) elFim.value = ultimoDia;
+    // Gráficos
+    const elInicioG = document.getElementById('grafico-data-inicio');
+    const elFimG = document.getElementById('grafico-data-fim');
+    if (elInicioG && !elInicioG.value) elInicioG.value = primeiroDia;
+    if (elFimG && !elFimG.value) elFimG.value = ultimoDia;
+
+    // Extrato (Início do ano atual até hoje por defeito)
+    const elInicioExt = document.getElementById('extrato-data-inicio');
+    const elFimExt = document.getElementById('extrato-data-fim');
+    if (elInicioExt && !elInicioExt.value) elInicioExt.value = `${ano}-01-01`;
+    if (elFimExt && !elFimExt.value) elFimExt.value = hoje.toISOString().split('T')[0];
 }
 
 // -----------------------------------------
-// GESTÃO DE ABAS (CORRIGIDA E COMPLETA)
+// GESTÃO DE ABAS
 // -----------------------------------------
 const abasValidas = ['registo', 'raspadinhas', 'historico', 'extrato', 'graficos'];
 
@@ -54,35 +61,19 @@ function mudarAba(abaDestino) {
         const btnRodape = document.getElementById(`nav-btn-${aba}`);
 
         if (aba === abaDestino) {
-            if (secao) {
-                secao.classList.remove('hidden');
-                secao.classList.add('flex');
-            }
-            if (btnTopo) {
-                btnTopo.className = "px-1 py-1 font-semibold text-emerald-400 border-b-2 border-emerald-400 transition truncate";
-            }
-            if (btnRodape) {
-                btnRodape.className = "flex flex-col items-center text-emerald-400";
-            }
+            if (secao) { secao.classList.remove('hidden'); secao.classList.add('flex'); }
+            if (btnTopo) btnTopo.className = "px-1 py-1 font-semibold text-emerald-400 border-b-2 border-emerald-400 transition truncate";
+            if (btnRodape) btnRodape.className = "flex flex-col items-center text-emerald-400";
         } else {
-            if (secao) {
-                secao.classList.add('hidden');
-                secao.classList.remove('flex');
-            }
-            if (btnTopo) {
-                btnTopo.className = "px-1 py-1 font-semibold text-slate-400 hover:text-slate-200 transition truncate";
-            }
-            if (btnRodape) {
-                btnRodape.className = "flex flex-col items-center hover:text-slate-200 text-slate-400";
-            }
+            if (secao) { secao.classList.add('hidden'); secao.classList.remove('flex'); }
+            if (btnTopo) btnTopo.className = "px-1 py-1 font-semibold text-slate-400 hover:text-slate-200 transition truncate";
+            if (btnRodape) btnRodape.className = "flex flex-col items-center hover:text-slate-200 text-slate-400";
         }
     });
 
-    // Ações específicas ao abrir certas abas
     if (abaDestino === 'historico') {
         renderizarHistoricoCompleto();
     } else if (abaDestino === 'extrato') {
-        povoarAnosFiltro();
         atualizarExtrato();
     } else if (abaDestino === 'graficos') {
         atualizarGraficoLinhas();
@@ -130,7 +121,7 @@ async function guardarDadosNoDrive() {
 }
 
 // -----------------------------------------
-// GESTÃO DE DEFINIÇÕES E CAIXA (ENGRENAGEM)
+// GESTÃO DE DEFINIÇÕES E CAIXA
 // -----------------------------------------
 function abrirConfigBanca() {
     const modal = document.getElementById('modal-definicoes');
@@ -195,12 +186,7 @@ async function confirmarMovimentoCaixaSub() {
         return;
     }
 
-    dadosApp.movimentosCaixa.push({
-        tipo: 'caixa',
-        subtipo: tipo,
-        valor: valor,
-        data: data
-    });
+    dadosApp.movimentosCaixa.push({ tipo: 'caixa', subtipo: tipo, valor: valor, data: data });
 
     await guardarDadosNoDrive();
     const modalSub = document.getElementById('modal-caixa-sub');
@@ -210,7 +196,7 @@ async function confirmarMovimentoCaixaSub() {
 }
 
 // -----------------------------------------
-// CÁLCULOS E RENDERIZAÇÃO GLOBAL
+// RENDERIZAÇÃO GLOBAL
 // -----------------------------------------
 function renderizarTudo() {
     calcularBancaTotal();
@@ -224,18 +210,13 @@ function calcularBancaTotal() {
     let banca = dadosApp.saldoInicial;
 
     dadosApp.apostas.forEach(a => {
-        if (a.estado === 'Venceu') {
-            banca += (a.valor * a.odd) - a.valor;
-        } else if (a.estado === 'Perdeu') {
-            banca -= a.valor;
-        }
+        if (a.estado === 'Venceu') banca += (a.valor * a.odd) - a.valor;
+        else if (a.estado === 'Perdeu') banca -= a.valor;
     });
 
     dadosApp.raspadinhas.forEach(r => {
         banca -= r.custo;
-        if (r.estado === 'Premiado') {
-            banca += r.premio;
-        }
+        if (r.estado === 'Premiado') banca += r.premio;
     });
 
     dadosApp.movimentosCaixa.forEach(m => {
@@ -244,9 +225,7 @@ function calcularBancaTotal() {
     });
 
     const elBanca = document.getElementById('banca-atual');
-    if (elBanca) {
-        elBanca.innerText = `${banca.toFixed(2)} €`;
-    }
+    if (elBanca) elBanca.innerText = `${banca.toFixed(2)} €`;
     return banca;
 }
 
@@ -291,8 +270,8 @@ function renderizarRecentes() {
     const contador = document.getElementById('contador-recentes');
     if (!container) return;
 
-    let apostasComIndex = dadosApp.apostas.map((a, idx) => ({ ...a, originalIndex: idx }));
-    apostasComIndex.sort((a, b) => new Date(b.data) - new Date(a.data));
+    let apostasComIndex = dadosApp.apostas.map((a, idx) => ({ ...a, originalIndex: idx }))
+        .sort((a, b) => new Date(b.data) - new Date(a.data));
 
     let hoje = new Date();
     let limiteDias = new Date();
@@ -303,9 +282,7 @@ function renderizarRecentes() {
     if (apostasRecentes.length === 0) {
         htmlRecentes = `<div class="text-center py-4 text-slate-500 text-xs italic">Ainda não existem apostas nos últimos 7 dias.</div>`;
     } else {
-        apostasRecentes.forEach(item => {
-            htmlRecentes += gerarHtmlApostaCard(item, item.originalIndex);
-        });
+        apostasRecentes.forEach(item => { htmlRecentes += gerarHtmlApostaCard(item, item.originalIndex); });
     }
 
     container.innerHTML = htmlRecentes;
@@ -404,7 +381,7 @@ function renderizarHistoricoCompleto() {
 }
 
 // -----------------------------------------
-// APOSTAS E RASPADINHAS (CRUD)
+// CRUD APOSTAS E RASPADINHAS
 // -----------------------------------------
 async function guardarAposta() {
     let modalidade = document.getElementById("modalidade-aposta").value;
@@ -518,146 +495,98 @@ async function apagarMovimentoCaixa(index) {
 }
 
 // -----------------------------------------
-// EXTRATO E FILTROS TEMPORAIS
+// EXTRATO COM INTERVALO DE DATAS (CONTABILÍSTICO)
 // -----------------------------------------
-function povoarAnosFiltro() {
-    const selectAno = document.getElementById('filtro-ano');
-    if (!selectAno) return;
-    
-    let anosSet = new Set();
-    dadosApp.apostas.forEach(a => { if (a.data) anosSet.add(a.data.split('-')[0]); });
-    dadosApp.raspadinhas.forEach(r => { if (r.data) anosSet.add(r.data.split('-')[0]); });
-    dadosApp.movimentosCaixa.forEach(m => { if (m.data) anosSet.add(m.data.split('-')[0]); });
-
-    const anoAtual = new Date().getFullYear().toString();
-    anosSet.add(anoAtual);
-
-    const valorSelecionado = selectAno.value;
-    selectAno.innerHTML = '<option value="todos">Todos</option>';
-    Array.from(anosSet).sort().reverse().forEach(ano => {
-        const opt = document.createElement('option');
-        opt.value = ano;
-        opt.innerText = ano;
-        selectAno.appendChild(opt);
-    });
-    selectAno.value = anosSet.has(valorSelecionado) ? valorSelecionado : 'todos';
-}
-
 function atualizarExtrato() {
     const tbody = document.getElementById('tabela-extrato');
     const contadorExtrato = document.getElementById('extrato-contador');
     
-    // Elementos dos Cards de Resumo (Saldo Anual/Global, Mensal, Semanal)
-    const elSaldoAnual = document.getElementById('saldo-anual') || document.querySelector('.saldo-anual') || document.getElementById('card-saldo-anual');
-    const elSaldoMensal = document.getElementById('saldo-mensal') || document.querySelector('.saldo-mensal') || document.getElementById('card-saldo-mensal');
-    const elSaldoSemanal = document.getElementById('saldo-semanal') || document.querySelector('.saldo-semanal') || document.getElementById('card-saldo-semanal');
+    const elSaldoPeriodo = document.getElementById('saldo-periodo') || document.querySelector('.saldo-periodo') || document.getElementById('card-saldo-periodo');
+    const elSaldoAnterior = document.getElementById('saldo-anterior') || document.querySelector('.saldo-anterior');
 
     if (!tbody) return;
 
-    const filtroAno = document.getElementById('filtro-ano').value;
-    const filtroMes = document.getElementById('filtro-mes').value;
-    const filtroSemana = document.getElementById('filtro-semana').value;
+    const dataInicioFiltro = document.getElementById('extrato-data-inicio').value;
+    const dataFimFiltro = document.getElementById('extrato-data-fim').value;
+
+    if (!dataInicioFiltro || !dataFimFiltro) return;
 
     let transacoes = [];
 
     dadosApp.apostas.forEach(a => {
         if (a.estado === 'Perdeu') {
-            transacoes.push({ data: a.data, desc: `Aposta Perdida: ${a.equipaA} vs ${a.equipaB}`, debito: a.valor, credito: 0, tipo: 'aposta' });
+            transacoes.push({ data: a.data, desc: `Aposta Perdida: ${a.equipaA} vs ${a.equipaB}`, debito: a.valor, credito: 0 });
         } else if (a.estado === 'Venceu') {
             let lucro = (a.valor * a.odd) - a.valor;
-            transacoes.push({ data: a.data, desc: `Aposta Vencida: ${a.equipaA} vs ${a.equipaB}`, debito: 0, credito: lucro, tipo: 'aposta' });
+            transacoes.push({ data: a.data, desc: `Aposta Vencida: ${a.equipaA} vs ${a.equipaB}`, debito: 0, credito: lucro });
         }
     });
 
     dadosApp.raspadinhas.forEach(r => {
-        transacoes.push({ data: r.data, desc: `Raspadinha: ${r.nome} (Custo)`, debito: r.custo, credito: 0, tipo: 'raspadinha' });
+        transacoes.push({ data: r.data, desc: `Raspadinha: ${r.nome} (Custo)`, debito: r.custo, credito: 0 });
         if (r.estado === 'Premiado' && r.premio > 0) {
-            transacoes.push({ data: r.data, desc: `Prémio Raspadinha: ${r.nome}`, debito: 0, credito: r.premio, tipo: 'raspadinha' });
+            transacoes.push({ data: r.data, desc: `Prémio Raspadinha: ${r.nome}`, debito: 0, credito: r.premio });
         }
     });
 
     dadosApp.movimentosCaixa.forEach(m => {
         if (m.subtipo === 'deposito') {
-            transacoes.push({ data: m.data, desc: `Depósito de Capital`, debito: 0, credito: m.valor, tipo: 'caixa' });
+            transacoes.push({ data: m.data, desc: `Depósito de Capital`, debito: 0, credito: m.valor });
         } else if (m.subtipo === 'levantamento') {
-            transacoes.push({ data: m.data, desc: `Levantamento de Capital`, debito: m.valor, credito: 0, tipo: 'caixa' });
+            transacoes.push({ data: m.data, desc: `Levantamento de Capital`, debito: m.valor, credito: 0 });
         }
     });
 
+    // Ordenar cronologicamente por data
     transacoes.sort((a, b) => new Date(a.data) - new Date(b.data));
 
-    // Cálculo dos totais para os cartões de resumo superior
-    let totalAnual = 0;
-    let totalMensal = 0;
-    let totalSemanal = 0;
+    // 1. Calcular Saldo Acumulado até ao dia ANTERIOR ao início do filtro (Saldo de Períodos Anteriores)
+    let acumuladoAnterior = dadosApp.saldoInicial;
+    let totalPeriodo = 0;
+
+    let transacoesFiltradas = [];
 
     transacoes.forEach(t => {
         if (!t.data) return;
-        const [tAno, tMes, tDia] = t.data.split('-');
-        const tVal = t.credito - t.debito;
+        let valorLiq = t.credito - t.debito;
 
-        // 1. Saldo Anual: Respeita o filtro de ano (se 'todos', acumula todo o histórico)
-        if (filtroAno === 'todos' || tAno === filtroAno) {
-            totalAnual += tVal;
-        }
-
-        // 2. Saldo Mensal: Se mês for 'todos', acumula todos os meses do ano filtrado (ou global se ano for 'todos')
-        const passaFiltroAnoParaMes = (filtroAno === 'todos' || tAno === filtroAno);
-        const passaFiltroMes = (filtroMes === 'todos' || parseInt(tMes) === parseInt(filtroMes));
-        if (passaFiltroAnoParaMes && passaFiltroMes) {
-            totalMensal += tVal;
-        }
-
-        // 3. Saldo Semanal: Se semana for 'todos', acumula todas as semanas do mês/ano filtrados
-        const dNum = parseInt(tDia);
-        const tSemana = dNum <= 7 ? 1 : dNum <= 14 ? 2 : dNum <= 21 ? 3 : 4;
-        const passaFiltroSemana = (filtroSemana === 'todas' || tSemana === parseInt(filtroSemana));
-        if (passaFiltroAnoParaMes && passaFiltroMes && passaFiltroSemana) {
-            totalSemanal += tVal;
+        if (t.data < dataInicioFiltro) {
+            acumuladoAnterior += valorLiq;
+        } else if (t.data >= dataInicioFiltro && t.data <= dataFimFiltro) {
+            transacoesFiltradas.push(t);
+            totalPeriodo += valorLiq;
         }
     });
 
-    if (elSaldoAnual) {
-        elSaldoAnual.innerText = `${totalAnual >= 0 ? '+' : ''}${totalAnual.toFixed(2)} €`;
-        elSaldoAnual.className = `text-center font-bold text-base ${totalAnual >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+    // Atualizar cartões de resumo superiores se existirem no HTML
+    if (elSaldoAnterior) {
+        elSaldoAnterior.innerText = `${acumuladoAnterior >= 0 ? '+' : ''}${acumuladoAnterior.toFixed(2)} €`;
+        elSaldoAnterior.className = `text-center font-bold text-base ${acumuladoAnterior >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
     }
-    if (elSaldoMensal) {
-        elSaldoMensal.innerText = `${totalMensal >= 0 ? '+' : ''}${totalMensal.toFixed(2)} €`;
-        elSaldoMensal.className = `text-center font-bold text-base ${totalMensal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
-    }
-    if (elSaldoSemanal) {
-        elSaldoSemanal.innerText = `${totalSemanal >= 0 ? '+' : ''}${totalSemanal.toFixed(2)} €`;
-        elSaldoSemanal.className = `text-center font-bold text-base ${totalSemanal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+    if (elSaldoPeriodo) {
+        elSaldoPeriodo.innerText = `${totalPeriodo >= 0 ? '+' : ''}${totalPeriodo.toFixed(2)} €`;
+        elSaldoPeriodo.className = `text-center font-bold text-base ${totalPeriodo >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
     }
 
-    let filtradas = transacoes.filter(t => {
-        if (!t.data) return false;
-        const [ano, mes, dia] = t.data.split('-');
-        if (filtroAno !== 'todos' && ano !== filtroAno) return false;
-        if (filtroMes !== 'todos' && parseInt(mes) !== parseInt(filtroMes)) return false;
-        if (filtroSemana !== 'todas') {
-            const dNum = parseInt(dia);
-            const sem = dNum <= 7 ? 1 : dNum <= 14 ? 2 : dNum <= 21 ? 3 : 4;
-            if (sem !== parseInt(filtroSemana)) return false;
-        }
-        return true;
-    });
-
+    // 2. Construir tabela começando com a linha de "Saldo de Períodos Anteriores"
     let htmlExtrato = `
-        <tr class="border-b border-slate-800 bg-slate-900/40">
-            <td class="py-1 px-1 text-slate-300 font-medium">Banca Inicial Configurada</td>
-            <td class="py-1 px-1 text-slate-500">-</td>
-            <td class="py-1 px-1 text-emerald-400">+${dadosApp.saldoInicial.toFixed(2)} €</td>
-            <td class="py-1 px-1 text-right font-bold text-white">${dadosApp.saldoInicial.toFixed(2)} €</td>
+        <tr class="border-b border-slate-800 bg-slate-900/60">
+            <td class="py-1.5 px-1 text-slate-300 font-medium">
+                Saldo de Períodos Anteriores 
+                <br><span class="text-[8px] text-slate-500">Acumulado antes de ${dataInicioFiltro}</span>
+            </td>
+            <td class="py-1.5 px-1 text-slate-500">-</td>
+            <td class="py-1.5 px-1 text-slate-500">-</td>
+            <td class="py-1.5 px-1 text-right font-bold text-white">${acumuladoAnterior.toFixed(2)} €</td>
         </tr>
     `;
 
-    let acumulado = dadosApp.saldoInicial;
+    let acumuladoAtual = acumuladoAnterior;
     let movimentosTotais = 0;
 
-    filtradas.forEach(t => {
+    transacoesFiltradas.forEach(t => {
         movimentosTotais++;
-        acumulado += (t.credito - t.debito);
+        acumuladoAtual += (t.credito - t.debito);
         let debitoStr = t.debito > 0 ? `-${t.debito.toFixed(2)} €` : "-";
         let creditoStr = t.credito > 0 ? `+${t.credito.toFixed(2)} €` : "-";
 
@@ -666,7 +595,7 @@ function atualizarExtrato() {
                 <td class="py-1 px-1"><b>${t.data}</b><br><span class="text-[8px] text-slate-400">${t.desc}</span></td>
                 <td class="py-1 px-1 text-rose-400">${debitoStr}</td>
                 <td class="py-1 px-1 text-emerald-400">${creditoStr}</td>
-                <td class="py-1 px-1 text-right font-bold ${acumulado >= dadosApp.saldoInicial ? 'text-emerald-400' : 'text-rose-400'}">${acumulado.toFixed(2)} €</td>
+                <td class="py-1 px-1 text-right font-bold ${acumuladoAtual >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${acumuladoAtual.toFixed(2)} €</td>
             </tr>
         `;
     });
@@ -709,9 +638,7 @@ function atualizarGraficoLinhas() {
     transacoes.sort((a, b) => new Date(a.data) - new Date(b.data));
 
     transacoes.forEach(t => {
-        if (t.data < dataInicioStr) {
-            saldoCorrente += t.val;
-        }
+        if (t.data < dataInicioStr) saldoCorrente += t.val;
     });
 
     let pontosGrafico = [];
