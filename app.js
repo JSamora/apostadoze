@@ -11,7 +11,7 @@ let state = {
 
 // Inicialização da Aplicação - Vai buscar sempre os dados frescos ao Google Drive logo ao abrir
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log("A iniciar a aplicação Apostas do Zé (Modo 100% Online)...");
+    console.log("A iniciar a aplicação Apostas do Zé (Modo Online Direto)...");
     await carregarDadosDaNuvem();
 });
 
@@ -29,11 +29,10 @@ async function carregarDadosDaNuvem() {
                 orcamento: dadosNuvem.orcamento || 0
             };
             renderApp();
-            console.log("Dados atualizados a partir da nuvem com sucesso!");
+            console.log("Dados carregados da nuvem com sucesso!");
         }
     } catch (erro) {
         console.error("Erro ao carregar dados da nuvem:", erro);
-        alert("Erro de ligação à nuvem. Verifica a tua internet.");
     }
 }
 
@@ -42,20 +41,19 @@ async function guardarDadosNaNuvem() {
     try {
         const payload = JSON.stringify(state);
         
-        const resposta = await fetch(WEB_APP_URL, {
-            method: 'POST',
-            body: new URLSearchParams({ data: payload })
-        });
+        // Enviamos via parâmetro GET 'salvar', o que contorna qualquer restrição de POST ou CORS
+        const urlComDados = `${WEB_APP_URL}?salvar=${encodeURIComponent(payload)}`;
         
+        const resposta = await fetch(urlComDados);
         const resultado = await resposta.json();
+        
         if (resultado.status === "success") {
             console.log("Dados gravados com sucesso na nuvem!");
         } else {
-            console.error("Erro reportado pelo servidor:", resultado.message);
+            console.error("Erro reportado pelo servidor:", resultado.error);
         }
     } catch (erro) {
         console.error("Erro ao guardar dados na nuvem:", erro);
-        alert("Não foi possível guardar os dados na nuvem.");
     }
 }
 
